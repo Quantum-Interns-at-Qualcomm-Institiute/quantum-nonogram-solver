@@ -1,0 +1,3 @@
+[submodule "tools/static/ui-kit"]
+	path = tools/static/ui-kit
+	url = https://github.com/andypeterson2/soft-machine-ui-kit.git

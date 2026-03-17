@@ -1,0 +1,7 @@
+services:
+  nonogram:
+    build: .
+    ports:
+      - "${PORT:-5055}:${PORT:-5055}"
+    environment:
+      PORT: ${PORT:-5055}
