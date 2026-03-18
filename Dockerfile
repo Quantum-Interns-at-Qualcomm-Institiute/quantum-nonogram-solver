@@ -6,6 +6,6 @@ COPY pyproject.toml .
 COPY tools/ tools/
 COPY nonogram/ nonogram/
 
-RUN pip install --no-cache-dir ".[web]"
+RUN pip install --no-cache-dir ".[web,quantum]"
 
 CMD ["python", "tools/webapp.py"]
