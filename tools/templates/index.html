@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nonogram</title>
+  <script src="/static/ui-kit/theme-bootstrap.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<aside id="sidebar" class="ui-scrollbar-thin">
+
+  <div id="sidebar-hdr" class="panel-hdr">
+    <span class="panel-title">Editor</span>
+  </div>
+
+  <div id="sidebar-inner">
+    <div id="mode-switch" role="group" aria-label="Editor mode">
+      <button class="mode-btn active" data-mode="draw">Draw</button>
+      <button class="mode-btn" data-mode="clues">Clues</button>
+    </div>
+    <div id="draw-view"></div>
+    <div id="clues-view" style="display:none"></div>
+    <input type="file" id="file-input" accept=".json" style="display:none" aria-label="Open puzzle file">
+  </div>
+
+</aside>
+
+<!-- Sidebar edge resize handle -->
+<div id="sidebar-edge" class="resize-handle v-handle" title="Drag to resize editor"></div>
+
+<!-- ═══════════════════ EDITOR TOGGLE ═══════════════════ -->
+<div id="toggle-strip" title="Toggle editor panel" role="button" tabindex="0" aria-label="Toggle editor panel">
+  <span id="toggle-label">&#9664; Editor</span>
+</div>
+
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+<div id="main-content">
+  <div id="right-pane">
+
+    <!-- Solution column -->
+    <div id="solver-col">
+
+      <!-- Solution header -->
+      <div class="panel-hdr" id="sol-hdr">
+        <span class="panel-title">Solution</span>
+      </div>
+
+      <!-- Controls bar: run + size toggle -->
+      <div id="sol-controls">
+        <label class="bench-label" for="trials-input">
+          <span class="bench-label-text">Trials</span>
+          <input type="number" id="trials-input" min="1" max="20" value="1">
+        </label>
+        <button class="solve-btn" id="btn-bench" style="background:var(--bench)">&#9658; Run on Simulator</button>
+        <div class="sol-controls-spacer"></div>
+        <div class="sol-size-toggle" id="sol-size-toggle" role="group" aria-label="Solution grid size">
+          <button class="sol-size-btn active" data-size="sm">S</button>
+          <button class="sol-size-btn" data-size="md">M</button>
+          <button class="sol-size-btn" data-size="lg">L</button>
+        </div>
+      </div>
+
+      <!-- Metrics pane -->
+      <div id="metrics-pane"></div>
+
+      <div id="cl-half">
+        <div class="sub-section-hdr">
+          <span class="sub-title">Classical</span>
+        </div>
+        <div id="cl-canvas">
+          <div id="cl-placeholder" class="placeholder-msg">Run Benchmark to see solutions.</div>
+        </div>
+      </div>
+
+      <div class="resize-handle h-handle" id="cq-handle"></div>
+
+      <div id="qu-half">
+        <div class="sub-section-hdr">
+          <span class="sub-title">Quantum</span>
+        </div>
+        <div id="qu-list">
+          <div id="qu-sol-placeholder" class="placeholder-msg">Run Benchmark to see solutions.</div>
+        </div>
+
+        <div class="resize-handle h-handle" id="qh-handle"></div>
+
+        <div class="sub-section-hdr">
+          <span class="sub-title">Histogram</span>
+          <label class="threshold-wrap"
+                 for="threshold-input"
+                 title="Probability threshold: outcomes above this line are marked as solutions. Auto-set to 3&times; the uniform random chance for this puzzle size. Type a value or drag the dashed line on the histogram.">
+            <span class="threshold-prefix">Thr</span>
+            <input type="number" id="threshold-input" min="0" max="100" step="0.01" value="0.50">
+            <span class="threshold-suffix">%</span>
+          </label>
+        </div>
+        <div id="qu-area">
+          <svg id="qu-histogram" width="100%" height="100%" aria-hidden="true"></svg>
+          <div id="qu-tooltip" class="histogram-tip" role="tooltip"></div>
+          <div id="qu-placeholder" class="placeholder-msg" style="display:none">Run Benchmark — histogram appears automatically.</div>
+        </div>
+      </div>
+
+    </div><!-- #solver-col -->
+
+  </div><!-- #right-pane -->
+</div><!-- #main-content -->
+
+<!-- ═══════════════════ SETTINGS TOGGLE ═══════════════════ -->
+<div id="console-toggle-strip" title="Toggle settings panel" role="button" tabindex="0" aria-label="Toggle settings panel">
+  <span id="console-toggle-label">&#9654; Settings</span>
+</div>
+
+<!-- Settings edge resize handle -->
+<div id="console-edge" class="resize-handle v-handle" title="Drag to resize settings"></div>
+
+<!-- ═══════════════════ SETTINGS PANEL ═══════════════════ -->
+<aside id="console-panel" aria-label="Settings">
+  <div id="console-panel-inner">
+
+    <!-- Scrollable top: title + dark mode + run log -->
+    <div id="settings-top">
+      <div class="settings-hdr">
+        <span class="settings-hdr-title">Settings</span>
+      </div>
+
+      <div class="settings-row" id="settings-theme-row">
+        <span class="settings-row-label" id="theme-mode-label">Toggle light mode</span>
+        <button id="theme-toggle" title="Toggle day/night theme" aria-label="Toggle day/night theme"></button>
+      </div>
+
+      <div id="console-hdr">
+        <span id="console-hdr-title">Run Log</span>
+        <button id="btn-clear-terminal" title="Clear log" aria-label="Clear run log"></button>
+      </div>
+      <div id="status-terminal" role="log" aria-live="polite" aria-label="Run log output">
+        <div id="status-terminal-inner"></div>
+      </div>
+    </div>
+
+    <!-- Pinned bottom: IBM hardware + cache -->
+    <div id="settings-bottom">
+
+      <!-- IBM Hardware -->
+      <div id="hw-settings-section">
+        <div class="settings-section-hdr">
+          <span class="settings-section-title">IBM Hardware</span>
+          <span id="hw-status-indicator" class="hw-status-off">Disconnected</span>
+        </div>
+        <div class="settings-fields">
+          <label class="settings-field-label" for="hw-token">API Token</label>
+          <textarea id="hw-token" rows="3" placeholder="Paste your IBM Quantum token here…"></textarea>
+
+          <fieldset class="hw-channel-group">
+            <legend class="settings-field-label">Channel</legend>
+            <label class="hw-radio-label"><input type="radio" name="hw-channel" value="ibm_quantum_platform" checked> IBM Quantum Platform</label>
+            <label class="hw-radio-label"><input type="radio" name="hw-channel" value="ibm_cloud"> IBM Cloud</label>
+          </fieldset>
+
+          <button class="settings-action-btn" id="hw-fetch-backends">Fetch Backends</button>
+          <div id="hw-backends-wrap" style="display:none">
+            <label class="settings-field-label" for="hw-backend-select">Backend</label>
+            <select id="hw-backend-select"></select>
+          </div>
+
+          <label class="settings-field-label" for="hw-shots">Shots</label>
+          <input type="number" id="hw-shots" min="64" max="8192" value="1024">
+
+          <div class="hw-connect-row">
+            <button id="hw-disconnect" class="settings-btn-sm settings-btn-red">Disconnect</button>
+            <button id="hw-connect" class="settings-btn-sm settings-btn-green">Connect</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cache info -->
+      <div id="runs-cache-box">
+        <div id="runs-cache-info">
+          <span id="runs-cache-count">— runs</span>
+          <span id="runs-cache-size"></span>
+          <span id="runs-cache-latest"></span>
+        </div>
+        <button id="btn-delete-runs" title="Delete all cached run files" aria-label="Delete all cached run files">Delete All</button>
+      </div>
+
+    </div><!-- #settings-bottom -->
+
+  </div>
+</aside>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+        crossorigin="anonymous"></script>
+<script>
+  const MAX_CLUES = {{ MAX_CLUES }};
+  const MAX_GRID  = {{ MAX_GRID }};
+</script>
+<script src="/static/ui-kit/icons.js"></script>
+<script src="/static/ui-kit/ui-kit.js"></script>
+<script src="/static/state.js"></script>
+<script src="/static/grid.js"></script>
+<script src="/static/solver.js"></script>
+<script src="/static/ui.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
