@@ -6,6 +6,9 @@
 
 @import url("ui-kit/ui-kit-core.css");
 @import url("ui-kit/components/scrollbar.css");
+@import url("ui-kit/components/spinner.css");
+@import url("ui-kit/components/log-terminal.css");
+@import url("ui-kit/components/tables.css");
 
 /* ── App-specific tokens (extend ui-kit) ─────────────────── */
 :root {
@@ -400,32 +403,8 @@ body {
 }
 #btn-clear-terminal:hover { opacity: 1; background: var(--surface2); }
 
-/* Terminal */
-#status-terminal {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--term-bg);
-  padding: 6px 8px;
-  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-}
-.term-line {
-  display: flex;
-  gap: 6px;
-  padding: 1px 0;
-  color: var(--term-text);
-}
-.term-ts {
-  color: var(--term-time, #6b6858);
-  flex-shrink: 0;
-  user-select: none;
-}
-.term-msg  { color: var(--term-text); }
-.term-ok   { color: var(--term-ok, var(--success)); }
-.term-err  { color: var(--term-err, var(--danger)); }
-.term-warn { color: var(--term-warn, var(--accent)); }
+/* Terminal: uses .log-terminal / .log-entry / .log-time / .log-msg from ui-kit */
+#status-terminal { border: none; padding: 6px 8px; font-size: 12px; }
 
 /* Trial navigation (multi-trial histogram) */
 .trial-nav {
@@ -625,17 +604,8 @@ body {
 .hw-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .hw-btn.active { background: var(--success-a18); border-color: var(--hw-active); color: var(--hw-active); }
 
-/* Spinner */
-@keyframes spin { to { transform: rotate(360deg); } }
-.spinner {
-  display: inline-block;
-  width: 10px; height: 10px;
-  border: 1px solid var(--surface-hl);
-  border-top-color: var(--text);
-  animation: spin 0.7s linear infinite;
-  vertical-align: middle;
-  margin-right: 2px;
-}
+/* Spinner: uses .ui-spinner-sm from ui-kit, with app size override */
+.ui-spinner-xs { width: 10px; height: 10px; border-width: 1px; vertical-align: middle; margin-right: 2px; }
 
 /* Corner icon buttons (inside grid) */
 .icon-btn {
@@ -689,36 +659,7 @@ body {
 }
 #metrics-pane.visible { max-height: 300px; overflow-y: auto; }
 
-.metrics-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  font-family: var(--font);
-}
-.metrics-table th {
-  background: var(--surface2);
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-  padding: 5px 10px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  position: sticky; top: 0;
-  white-space: nowrap;
-}
-.metrics-table td {
-  padding: 4px 10px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-}
-.metrics-table td.metric-label {
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.metrics-table tbody tr:hover td { background: var(--surface2); }
+/* Metrics table: uses .ui-table-sticky from ui-kit */
 
 #cl-half {
   flex: 1;
