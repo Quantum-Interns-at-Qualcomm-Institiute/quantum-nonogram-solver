@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nonogram</title>
-  <script src="/static/ui-kit/theme-bootstrap.js"></script>
+  <script src="https://andypeterson2.github.io/ui-kit/theme-bootstrap.js"></script>
+  <link rel="stylesheet" href="https://andypeterson2.github.io/ui-kit/ui-kit.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -197,12 +198,19 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
         crossorigin="anonymous"></script>
+<script src="https://andypeterson2.github.io/ui-kit/service-config.js"></script>
 <script>
+  {% if MAX_CLUES is defined %}
   const MAX_CLUES = {{ MAX_CLUES }};
   const MAX_GRID  = {{ MAX_GRID }};
+  {% else %}
+  const MAX_CLUES = 3;
+  const MAX_GRID  = 6;
+  {% endif %}
+  const API_BASE  = ServiceConfig.get("nonogram", "http://localhost:5055");
 </script>
-<script src="/static/ui-kit/icons.js"></script>
-<script src="/static/ui-kit/ui-kit.js"></script>
+<script src="https://andypeterson2.github.io/ui-kit/icons.js"></script>
+<script src="https://andypeterson2.github.io/ui-kit/ui-kit.js"></script>
 <script src="/static/state.js"></script>
 <script src="/static/grid.js"></script>
 <script src="/static/solver.js"></script>

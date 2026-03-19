@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nonogram"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "qiskit>=2.2",
+    "qiskit-algorithms",
+    "qiskit-ibm-runtime",
+]
+
+[project.optional-dependencies]
+web = [
+    "flask",
+    "flask-cors",
+    "flask-socketio",
+]
+dev = [
+    "pytest",
+    "matplotlib",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nonogram*", "tools*"]

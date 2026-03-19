@@ -441,7 +441,7 @@ async function fetchRunsInfo() {
   const box = $("runs-cache-box");
   if (!box) return;
   try {
-    const r = await fetch("/api/runs/info");
+    const r = await fetch(API_BASE + "/api/runs/info");
     const d = await r.json();
     const kb = (d.total_bytes / 1024).toFixed(1);
     const newestStr = d.newest

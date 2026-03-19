@@ -50,6 +50,7 @@ _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT))
 
 from flask import Flask, render_template
+from flask_cors import CORS
 from flask_socketio import SocketIO
 
 from tools import state as app_state
@@ -59,6 +60,7 @@ from tools.routes import ALL_BLUEPRINTS
 # ── Flask setup ──────────────────────────────────────────────────────────────
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["SECRET_KEY"] = "nonogram-dev-key"
+CORS(app)
 socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
 
 # Bind SocketIO to state module so helpers can emit
