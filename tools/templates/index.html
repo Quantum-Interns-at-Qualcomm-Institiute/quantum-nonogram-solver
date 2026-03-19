@@ -137,6 +137,8 @@
         <button id="theme-toggle" title="Toggle day/night theme" aria-label="Toggle day/night theme"></button>
       </div>
 
+      <div id="backend-connect"></div>
+
       <div id="console-hdr">
         <span id="console-hdr-title">Run Log</span>
         <button id="btn-clear-terminal" title="Clear log" aria-label="Clear run log"></button>
@@ -216,5 +218,18 @@
 <script src="/static/solver.js"></script>
 <script src="/static/ui.js"></script>
 <script src="/static/app.js"></script>
+<script>
+  (function() {
+    var el = document.getElementById('backend-connect');
+    if (el && window.UIKit && UIKit.initConnect) {
+      UIKit.initConnect(el, {
+        service: 'nonogram',
+        defaultHost: 'localhost',
+        defaultPort: 5055,
+        label: 'Backend'
+      });
+    }
+  })();
+</script>
 </body>
 </html>
