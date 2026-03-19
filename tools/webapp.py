@@ -82,9 +82,25 @@ def index():
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 
+def _get_ssl_context():
+    """Return (cert, key) paths if dev certs exist, else None."""
+    from pathlib import Path
+    for d in [
+        Path(os.environ.get("DEV_CERT_DIR", "")),
+        Path(__file__).resolve().parents[2] / ".certs",
+    ]:
+        cert, key = d / "cert.pem", d / "key.pem"
+        if cert.is_file() and key.is_file():
+            return (str(cert), str(key))
+    return None
+
+
 if __name__ == "__main__":
     PORT = 5055
-    threading.Timer(1.2, lambda: webbrowser.open(f"http://localhost:{PORT}")).start()
-    print(f"Starting Nonogram web app \u2192 http://localhost:{PORT}")
+    ssl_ctx = _get_ssl_context()
+    scheme = "https" if ssl_ctx else "http"
+    threading.Timer(1.2, lambda: webbrowser.open(f"{scheme}://localhost:{PORT}")).start()
+    print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")
     HOST = os.environ.get("NONOGRAM_HOST", "0.0.0.0")
-    socketio.run(app, host=HOST, port=PORT, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host=HOST, port=PORT, debug=False, allow_unsafe_werkzeug=True,
+                 ssl_context=ssl_ctx)
