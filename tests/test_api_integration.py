@@ -269,7 +269,7 @@ class TestConfigEndpoint:
         data = rv.get_json()
         assert data["max_grid"] == MAX_GRID
         assert data["max_clues"] == MAX_CLUES
-        assert data["max_grid"] == 6
+        assert data["max_grid"] == 10
         assert data["max_clues"] == 3
 
 
