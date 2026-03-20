@@ -1,6 +1,7 @@
 # Hidden files
 .*
 !.git*
+!.dashboard.yaml
 
 # Python
 __pycache__/
