@@ -1,4 +1,5 @@
 """Server state and Socket.IO helpers for the nonogram web app."""
+
 from __future__ import annotations
 
 import threading

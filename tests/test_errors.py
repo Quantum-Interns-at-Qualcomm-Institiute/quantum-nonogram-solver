@@ -28,8 +28,13 @@ class TestHierarchy:
 
     def test_catch_all_with_nonogram_error(self):
         """All custom exceptions are catchable via NonogramError."""
-        for exc_cls in (ValidationError, ClassicalSolverError,
-                        QuantumSolverError, HardwareError, PuzzleIOError):
+        for exc_cls in (
+            ValidationError,
+            ClassicalSolverError,
+            QuantumSolverError,
+            HardwareError,
+            PuzzleIOError,
+        ):
             try:
                 raise exc_cls("test")
             except NonogramError:

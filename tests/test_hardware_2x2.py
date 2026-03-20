@@ -35,8 +35,8 @@ Shots:     1024
 
 Run:  pytest tests/test_hardware_2x2.py -v -s
 """
-import pytest
 
+import pytest
 from conftest import load_ibm_token
 
 
@@ -59,13 +59,15 @@ def test_hardware_2x2_all_twos():
     from nonogram.quantum import quantum_solve_hardware
 
     row_clues = [(2,), (2,)]
-    col_clues  = [(2,), (2,)]
+    col_clues = [(2,), (2,)]
 
     GROVER_ITERS = 1
-    SHOTS        = 1024
+    SHOTS = 1024
 
-    print(f"\nSubmitting 2×2 all-2s puzzle to IBM quantum hardware "
-          f"({SHOTS} shots, {GROVER_ITERS} Grover iteration, least-busy backend)…")
+    print(
+        f"\nSubmitting 2×2 all-2s puzzle to IBM quantum hardware "
+        f"({SHOTS} shots, {GROVER_ITERS} Grover iteration, least-busy backend)…"
+    )
     print("Error mitigation: dynamical decoupling + Pauli twirling enabled.")
     print("Transpiled circuit depth: ~142 gates.")
     print("Waiting for IBM queue — this may take a few minutes.")
@@ -89,20 +91,22 @@ def test_hardware_2x2_all_twos():
     print("\nTop 5 results:")
     print(f"  {'IBM bitstring':<12}  {'Row-major grid':<12}  {'Count':>6}  {'Prob':>7}")
     for bs, cnt in top5:
-        grid = bs[::-1]   # reverse Qiskit little-endian → row-major
-        print(f"  {bs:<12}  {grid:<12}  {cnt:>6}  {cnt/total:>6.2%}")
+        grid = bs[::-1]  # reverse Qiskit little-endian → row-major
+        print(f"  {bs:<12}  {grid:<12}  {cnt:>6}  {cnt / total:>6.2%}")
 
-    expected   = "1" * 4
+    expected = "1" * 4
     top_ibm_bs = top5[0][0]
-    top_grid   = top_ibm_bs[::-1]
-    top_prob   = top5[0][1] / total
+    top_grid = top_ibm_bs[::-1]
+    top_prob = top5[0][1] / total
 
     # Check whether the all-ones state was measured
     all_ones_ibm = "1" * 4
     if all_ones_ibm in counts:
         p_correct = counts[all_ones_ibm] / total
-        print(f"\nAll-ones state probability: {p_correct:.2%}  "
-              f"(noiseless target: ~47.3 %,  random baseline: ~6.25 %)")
+        print(
+            f"\nAll-ones state probability: {p_correct:.2%}  "
+            f"(noiseless target: ~47.3 %,  random baseline: ~6.25 %)"
+        )
     else:
         p_correct = 0.0
         print("\nAll-ones state: not observed in this run.")
@@ -123,8 +127,7 @@ def test_hardware_2x2_all_twos():
     # ── Secondary assertion: the correct solution should be the top result ──
     # (or at least show a strong non-trivial probability)
     if top_grid == expected:
-        print(f"\n✓  CORRECT — all-ones state '{expected}' is the top result "
-              f"at {top_prob:.2%}.")
+        print(f"\n✓  CORRECT — all-ones state '{expected}' is the top result at {top_prob:.2%}.")
     else:
         # Correct answer may be the 2nd-best due to noise; check it's present
         # with at least 10 % probability.
@@ -132,6 +135,8 @@ def test_hardware_2x2_all_twos():
             f"All-ones state probability {p_correct:.2%} is too low — "
             "quantum signal not visible for the correct solution"
         )
-        print(f"\n⚠  Top result '{top_grid}' differs from expected '{expected}' "
-              "— hardware noise shifted the peak.")
+        print(
+            f"\n⚠  Top result '{top_grid}' differs from expected '{expected}' "
+            "— hardware noise shifted the peak."
+        )
         print(f"   All-ones state still present at {p_correct:.2%}  ✓")

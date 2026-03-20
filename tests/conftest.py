@@ -36,6 +36,6 @@ def load_ibm_token() -> str | None:
     for line in env_path.read_text().splitlines():
         line = line.strip()
         if line.startswith("KEY="):
-            tok = line[len("KEY="):].strip()
+            tok = line[len("KEY=") :].strip()
             return tok if tok else None
     return None

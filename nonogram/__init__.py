@@ -51,6 +51,7 @@ Usage
     data = load_puzzle("my_puzzle.non.json")
 """
 
+from nonogram.classical import classical_solve
 from nonogram.core import (
     display_nonogram,
     grid_to_clues,
@@ -60,8 +61,16 @@ from nonogram.core import (
     validate,
     var_clauses,
 )
-from nonogram.classical import classical_solve
-from nonogram.quantum import quantum_solve
+from nonogram.errors import (
+    ClassicalSolverError,
+    HardwareError,
+    NonogramError,
+    PuzzleIOError,
+    QuantumSolverError,
+    SolverError,
+    ValidationError,
+)
+from nonogram.io import load_batch, load_puzzle, save_batch, save_puzzle
 from nonogram.metrics import (
     ClassicalMetrics,
     ComparisonReport,
@@ -69,21 +78,12 @@ from nonogram.metrics import (
     benchmark,
     print_report,
 )
-from nonogram.io import save_puzzle, load_puzzle, save_batch, load_batch
+from nonogram.quantum import quantum_solve
 from nonogram.solver import (
-    Solver,
     ClassicalSolver,
-    QuantumSimulatorSolver,
     QuantumHardwareSolver,
-)
-from nonogram.errors import (
-    NonogramError,
-    ValidationError,
-    SolverError,
-    ClassicalSolverError,
-    QuantumSolverError,
-    HardwareError,
-    PuzzleIOError,
+    QuantumSimulatorSolver,
+    Solver,
 )
 
 __all__ = [
