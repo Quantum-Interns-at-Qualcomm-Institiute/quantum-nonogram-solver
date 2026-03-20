@@ -43,6 +43,21 @@ class ClassicalMetrics:
     peak_memory_kb: float
     """Peak heap allocation during the solve (kilobytes)."""
 
+    clause_evaluations: int = 0
+    """Total constraint clause evaluations across all candidates."""
+
+    subclause_evaluations: int = 0
+    """Total subclause evaluations (valid pattern checks)."""
+
+    literal_evaluations: int = 0
+    """Total individual literal evaluations."""
+
+    constraint_checks: int = 0
+    """Total constraint checks (alias for clause_evaluations)."""
+
+    early_terminations: int = 0
+    """Candidates rejected before evaluating all clauses."""
+
     configs_per_second: float = field(init=False)
     """Throughput: configurations evaluated per second."""
 
@@ -93,6 +108,61 @@ class QuantumMetrics:
 
 
 @dataclass
+class StaticCircuitAnalysis:
+    """Static quantum circuit properties extracted without simulation.
+
+    Provides gate counts, circuit depth, and two-qubit gate density metrics
+    that characterize the circuit's resource requirements without needing
+    to run a simulator. This eliminates simulator runtime as a bottleneck
+    and gives perfectly reproducible measurements.
+    """
+
+    num_qubits: int
+    """Total qubits in the Grover circuit (problem + ancilla)."""
+
+    circuit_depth: int
+    """Critical-path length (number of gate layers)."""
+
+    total_gate_count: int
+    """Total number of gates."""
+
+    two_qubit_gate_count: int
+    """Number of 2+-qubit (entangling) gates."""
+
+    gate_counts_by_type: dict[str, int]
+    """Per-gate-type breakdown."""
+
+    grover_iterations: int
+    """Number of Grover operator applications."""
+
+    two_qubit_gate_density: float = field(init=False)
+    """Fraction of gates that are 2+-qubit entangling gates (0–1)."""
+
+    depth_per_iteration: float = field(init=False)
+    """Circuit depth per Grover iteration."""
+
+    gates_per_qubit: float = field(init=False)
+    """Average gates per qubit."""
+
+    def __post_init__(self) -> None:
+        self.two_qubit_gate_density = (
+            self.two_qubit_gate_count / self.total_gate_count
+            if self.total_gate_count > 0
+            else 0.0
+        )
+        self.depth_per_iteration = (
+            self.circuit_depth / self.grover_iterations
+            if self.grover_iterations > 0
+            else self.circuit_depth
+        )
+        self.gates_per_qubit = (
+            self.total_gate_count / self.num_qubits
+            if self.num_qubits > 0
+            else 0.0
+        )
+
+
+@dataclass
 class ComparisonReport:
     """Side-by-side comparison of classical and quantum nonogram solving."""
 
@@ -111,6 +181,12 @@ class ComparisonReport:
     # --- solver results (None if that solver was not run) ---
     classical: ClassicalMetrics | None = None
     quantum: QuantumMetrics | None = None
+
+    # --- static analysis (None if not computed) ---
+    static_circuit: StaticCircuitAnalysis | None = None
+
+    # --- constraint density (None if not computed) ---
+    constraint_density_metrics: dict | None = None
 
     # --- derived comparison metrics ---
     theoretical_grover_speedup: float = field(init=False, default=0.0)
@@ -138,6 +214,54 @@ class ComparisonReport:
 
 
 # ---------------------------------------------------------------------------
+# Static circuit analysis
+# ---------------------------------------------------------------------------
+
+
+def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
+    """Build the Grover circuit for *puzzle* and extract static metrics.
+
+    This constructs the circuit and measures gate counts, depth, and
+    two-qubit gate density without running any simulation. Results are
+    perfectly reproducible and free of simulator overhead.
+
+    Parameters
+    ----------
+    puzzle : tuple[list, list]
+        (row_clues, col_clues) tuple.
+
+    Returns
+    -------
+    StaticCircuitAnalysis
+        Circuit properties including gate counts and density metrics.
+    """
+    from qiskit.circuit.library import PhaseOracleGate
+    from qiskit_algorithms import AmplificationProblem, Grover
+
+    expression = puzzle_to_boolean(row_clues=puzzle[0], col_clues=puzzle[1])
+    oracle = PhaseOracleGate(expression)
+    problem = AmplificationProblem(oracle)
+
+    iterations_used = Grover.optimal_num_iterations(
+        num_solutions=1, num_qubits=oracle.num_qubits
+    )
+    grover = Grover(iterations=iterations_used)
+    circuit = grover.construct_circuit(problem, measurement=False)
+
+    ops = circuit.count_ops()
+    two_qubit = circuit.num_nonlocal_gates()
+
+    return StaticCircuitAnalysis(
+        num_qubits=circuit.num_qubits,
+        circuit_depth=circuit.depth(),
+        total_gate_count=sum(ops.values()),
+        two_qubit_gate_count=two_qubit,
+        gate_counts_by_type=dict(ops),
+        grover_iterations=iterations_used,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Benchmark runner
 # ---------------------------------------------------------------------------
 
@@ -146,6 +270,8 @@ def benchmark(
     puzzle: tuple[list, list],
     run_classical: bool = True,
     run_quantum: bool = True,
+    static_analysis: bool = False,
+    compute_constraint_density: bool = False,
 ) -> ComparisonReport:
     """Run one or both solvers on *puzzle* and collect comparison metrics.
 
@@ -155,6 +281,10 @@ def benchmark(
             Set False to skip if the puzzle is too large (> ~20 variables).
         run_quantum: Whether to run the quantum Grover solver.
             Requires qiskit and tweedledum.
+        static_analysis: Whether to compute static circuit analysis
+            (gate counts, depth, density) without running the simulator.
+        compute_constraint_density: Whether to compute constraint density
+            metrics from the clue structure.
 
     Returns:
         A :class:`ComparisonReport` populated with all measured metrics.
@@ -176,6 +306,8 @@ def benchmark(
 
     classical_metrics: ClassicalMetrics | None = None
     quantum_metrics: QuantumMetrics | None = None
+    static_circuit: StaticCircuitAnalysis | None = None
+    density_metrics: dict | None = None
 
     # --- Classical ---
     if run_classical:
@@ -183,7 +315,7 @@ def benchmark(
 
         tracemalloc.start()
         t0 = time.perf_counter()
-        solutions = classical_solve(puzzle)
+        solutions, exec_counts = classical_solve(puzzle, collect_counts=True)
         elapsed = time.perf_counter() - t0
         _, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
@@ -193,6 +325,11 @@ def benchmark(
             configurations_evaluated=search_space,
             solutions_found=len(solutions),
             peak_memory_kb=peak / 1024,
+            clause_evaluations=exec_counts.clause_evaluations,
+            subclause_evaluations=exec_counts.subclause_evaluations,
+            literal_evaluations=exec_counts.literal_evaluations,
+            constraint_checks=exec_counts.constraint_checks,
+            early_terminations=exec_counts.early_terminations,
         )
 
     # --- Quantum ---
@@ -245,6 +382,16 @@ def benchmark(
             peak_memory_kb=peak / 1024,
         )
 
+    # --- Static circuit analysis ---
+    if static_analysis:
+        static_circuit = analyze_circuit(puzzle)
+
+    # --- Constraint density ---
+    if compute_constraint_density:
+        from nonogram.data import constraint_density
+
+        density_metrics = constraint_density(row_clues, col_clues)
+
     return ComparisonReport(
         rows=n,
         cols=d,
@@ -253,6 +400,8 @@ def benchmark(
         boolean_expression_length=expr_len,
         classical=classical_metrics,
         quantum=quantum_metrics,
+        static_circuit=static_circuit,
+        constraint_density_metrics=density_metrics,
     )
 
 
@@ -317,6 +466,13 @@ def print_report(report: ComparisonReport) -> None:
     print(row("Configs evaluated", fmt(c and c.configurations_evaluated, ",d"), "N/A"))
     print(row("Throughput (configs/s)", fmt(c and c.configs_per_second, ",.0f"), "N/A"))
 
+    # Classical execution counts
+    if c and c.clause_evaluations > 0:
+        print(row("Clause evaluations", f"{c.clause_evaluations:,}", "N/A"))
+        print(row("Subclause evaluations", f"{c.subclause_evaluations:,}", "N/A"))
+        print(row("Literal evaluations", f"{c.literal_evaluations:,}", "N/A"))
+        print(row("Early terminations", f"{c.early_terminations:,}", "N/A"))
+
     # Quantum-specific
     print(row("Qubits", "N/A", fmt(q and q.num_qubits, "d")))
     print(row("Circuit depth", "N/A", fmt(q and q.circuit_depth, ",d")))
@@ -328,7 +484,7 @@ def print_report(report: ComparisonReport) -> None:
         row(
             "Oracle validation",
             "N/A",
-            "✓ correct" if q and q.oracle_evaluation_correct else ("✗ wrong" if q else "—"),
+            "correct" if q and q.oracle_evaluation_correct else ("wrong" if q else "—"),
         )
     )
 
@@ -337,17 +493,42 @@ def print_report(report: ComparisonReport) -> None:
         gate_str = "  ".join(f"{g}:{n}" for g, n in top_gates)
         print(row("Top gate types", "N/A", gate_str[:W]))
 
+    # Static circuit analysis
+    sc = report.static_circuit
+    if sc:
+        print(section("Static Circuit Analysis"))
+        print(row("Qubits", "", str(sc.num_qubits)))
+        print(row("Circuit depth", "", f"{sc.circuit_depth:,}"))
+        print(row("Total gates", "", f"{sc.total_gate_count:,}"))
+        print(row("2-qubit gates", "", f"{sc.two_qubit_gate_count:,}"))
+        print(row("2-qubit gate density", "", f"{sc.two_qubit_gate_density:.2%}"))
+        print(row("Depth per iteration", "", f"{sc.depth_per_iteration:,.1f}"))
+        print(row("Gates per qubit", "", f"{sc.gates_per_qubit:,.1f}"))
+        print(row("Grover iterations", "", str(sc.grover_iterations)))
+
+    # Constraint density
+    cd = report.constraint_density_metrics
+    if cd:
+        print(section("Constraint Density"))
+        print(row("Row configs", str(cd["row_configs"]), ""))
+        print(row("Col configs", str(cd["col_configs"]), ""))
+        print(row("Total configs", f"{cd['total_configs']:,}", ""))
+        print(row("Mean configs/line", f"{cd['mean_configs']:.1f}", ""))
+        print(row("Min configs", str(cd["min_configs"]), ""))
+        print(row("Max configs", str(cd["max_configs"]), ""))
+        print(row("Density ratio", f"{cd['density_ratio']:.4f}", ""))
+
     # Comparison
     if c and q:
         print(section("Comparison"))
         print(
             row(
                 "Theoretical Grover speedup",
-                f"√{report.search_space_size:,}",
-                f"≈{report.theoretical_grover_speedup:,.0f}×",
+                f"sqrt({report.search_space_size:,})",
+                f"~{report.theoretical_grover_speedup:,.0f}x",
             )
         )
-        print(row("Actual speedup", f"{report.actual_speedup:,.1f}×", ""))
+        print(row("Actual speedup", f"{report.actual_speedup:,.1f}x", ""))
         print(
             row("Advantage ratio (actual/theoretical)", f"{report.quantum_advantage_ratio:.3f}", "")
         )
@@ -357,5 +538,16 @@ def print_report(report: ComparisonReport) -> None:
         print(row("Quantum oracle calls (est.)", "", f"{grover_oracle:,}"))
         reduction = (1 - grover_oracle / classical_oracle) * 100 if classical_oracle else 0
         print(row("Oracle call reduction", "", f"{reduction:.1f}%"))
+
+        # Execution count comparison
+        if c.constraint_checks > 0:
+            print(row("Classical constraint checks", f"{c.constraint_checks:,}", ""))
+            print(row("Quantum oracle calls", "", f"{grover_oracle:,}"))
+            check_reduction = (
+                (1 - grover_oracle / c.constraint_checks) * 100
+                if c.constraint_checks
+                else 0
+            )
+            print(row("Constraint check reduction", "", f"{check_reduction:.1f}%"))
 
     print(f"\n{'═' * 64}\n")
