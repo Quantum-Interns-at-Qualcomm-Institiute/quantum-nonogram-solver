@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install -e ".[quantum,web,dev]"
+        run: pip install -e "."
 
       - name: Run tests
         run: pytest tests/ -v --tb=short -m "not slow"
