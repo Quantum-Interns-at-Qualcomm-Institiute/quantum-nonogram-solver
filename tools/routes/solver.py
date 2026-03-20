@@ -1,4 +1,5 @@
 """Solver routes: classical solve, quantum solve, benchmark."""
+
 from __future__ import annotations
 
 import json
@@ -8,10 +9,9 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
-from nonogram.errors import NonogramError
+from tools.chart import render_chart_b64, report_to_dict
 from tools.config import RUNS_DIR
-from tools.state import state, state_lock, emit_status, set_busy
-from tools.chart import report_to_dict, render_chart_b64
+from tools.state import emit_status, set_busy, state
 
 bp = Blueprint("solver", __name__)
 
@@ -27,8 +27,18 @@ def _save_run(payload: dict) -> None:
 
 
 def _build_payload(
-    report, solutions, qu_counts, rows, cols, trials,
-    cl_times, qu_times, chart_b64, hardware=None, row_clues=None, col_clues=None,
+    report,
+    solutions,
+    qu_counts,
+    rows,
+    cols,
+    trials,
+    cl_times,
+    qu_times,
+    chart_b64,
+    hardware=None,
+    row_clues=None,
+    col_clues=None,
     qu_counts_per_trial=None,
 ) -> dict:
     """Build the common payload dict for bench_done events and run persistence."""
@@ -39,9 +49,11 @@ def _build_payload(
         "solutions": solutions,
         "qu_counts": qu_counts,
         "qu_counts_per_trial": qu_counts_per_trial,
-        "rows": rows, "cols": cols,
+        "rows": rows,
+        "cols": cols,
         "trials": trials,
-        "cl_times": cl_times, "qu_times": qu_times,
+        "cl_times": cl_times,
+        "qu_times": qu_times,
         "chart_img": chart_b64,
         "hardware": hardware,
         "puzzle": {
@@ -63,6 +75,7 @@ def _get_quantum_solver():
     hw_cfg = state["hw_config"]
     if hw_cfg:
         from nonogram.solver import QuantumHardwareSolver
+
         return QuantumHardwareSolver(
             token=hw_cfg["token"],
             backend_name=hw_cfg["backend_name"],
@@ -70,6 +83,7 @@ def _get_quantum_solver():
             shots=hw_cfg["shots"],
         )
     from nonogram.solver import QuantumSimulatorSolver
+
     return QuantumSimulatorSolver()
 
 
@@ -82,20 +96,21 @@ def api_solve_classical():
     set_busy(True)
 
     from nonogram.solver import ClassicalSolver
+
     solver = ClassicalSolver()
     emit_status(f"{solver.name} solver running\u2026", "warn")
 
     def _work():
         try:
             from tools.state import socketio
+
             result = solver.solve((row_clues, col_clues))
             solutions = result["solutions"]
-            socketio.emit("cl_done", {"solutions": solutions,
-                                      "rows": rows, "cols": cols})
-            emit_status(
-                f"{solver.name}: {len(solutions)} solution(s) found.", "ok")
+            socketio.emit("cl_done", {"solutions": solutions, "rows": rows, "cols": cols})
+            emit_status(f"{solver.name}: {len(solutions)} solution(s) found.", "ok")
         except Exception as exc:
             from tools.state import socketio
+
             socketio.emit("solver_error", {"message": str(exc)})
             emit_status(f"{solver.name} error: {exc}", "err")
         finally:
@@ -118,22 +133,22 @@ def api_solve_quantum():
     def _work():
         try:
             from tools.state import socketio
+
             result = solver.solve((row_clues, col_clues))
             counts = result["counts"]
-            socketio.emit("qu_done", {"counts": counts,
-                                      "rows": rows, "cols": cols})
+            socketio.emit("qu_done", {"counts": counts, "rows": rows, "cols": cols})
             if "backend_name" in result:
-                emit_status(
-                    f"{solver.name} complete.", "ok")
+                emit_status(f"{solver.name} complete.", "ok")
             else:
                 n_above = sum(
-                    1 for p in counts.values()
-                    if p >= max(3.0 / (2 ** (rows * cols)), 0.005))
+                    1 for p in counts.values() if p >= max(3.0 / (2 ** (rows * cols)), 0.005)
+                )
                 emit_status(
-                    f"Quantum: simulation complete. "
-                    f"{n_above} above-threshold outcome(s).", "ok")
+                    f"Quantum: simulation complete. {n_above} above-threshold outcome(s).", "ok"
+                )
         except Exception as exc:
             from tools.state import socketio
+
             socketio.emit("solver_error", {"message": str(exc)})
             emit_status(f"Quantum error: {exc}", "err")
         finally:
@@ -162,12 +177,13 @@ def api_benchmark():
             from tools.state import socketio
 
             if hw_cfg:
-                from nonogram.quantum import quantum_solve_hardware
                 import time
+
+                from nonogram.quantum import quantum_solve_hardware
+
                 cl_times: list[float] = []
                 for _ in range(trials):
-                    rpt = benchmark((row_clues, col_clues),
-                                    run_classical=True, run_quantum=False)
+                    rpt = benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
                     if rpt.classical:
                         cl_times.append(rpt.classical.solve_time_s)
                 t0 = time.perf_counter()
@@ -179,35 +195,38 @@ def api_benchmark():
                     shots=hw_cfg["shots"],
                 )
                 qu_times = [time.perf_counter() - t0]
-                report = benchmark((row_clues, col_clues),
-                                   run_classical=True, run_quantum=False)
+                report = benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
                 solutions = classical_solve((row_clues, col_clues))
                 chart_b64 = render_chart_b64(report, cl_times, qu_times)
                 payload = _build_payload(
-                    report, solutions, hw_counts, rows, cols, trials,
-                    cl_times, qu_times, chart_b64,
+                    report,
+                    solutions,
+                    hw_counts,
+                    rows,
+                    cols,
+                    trials,
+                    cl_times,
+                    qu_times,
+                    chart_b64,
                     hardware=backend_name,
-                    row_clues=row_clues, col_clues=col_clues,
+                    row_clues=row_clues,
+                    col_clues=col_clues,
                 )
                 _save_run(payload)
                 socketio.emit("bench_done", payload)
-                emit_status(
-                    f"Benchmark complete ({label}) \u2014 hardware: {backend_name}.",
-                    "ok")
+                emit_status(f"Benchmark complete ({label}) \u2014 hardware: {backend_name}.", "ok")
             else:
                 reports = [
-                    benchmark((row_clues, col_clues),
-                              run_classical=True, run_quantum=True)
+                    benchmark((row_clues, col_clues), run_classical=True, run_quantum=True)
                     for _ in range(trials)
                 ]
-                cl_times = [r.classical.solve_time_s
-                            for r in reports if r.classical]
-                qu_times = [r.quantum.solve_time_s
-                            for r in reports if r.quantum]
+                cl_times = [r.classical.solve_time_s for r in reports if r.classical]
+                qu_times = [r.quantum.solve_time_s for r in reports if r.quantum]
                 report = reports[-1]
                 solutions = classical_solve((row_clues, col_clues))
                 # Collect per-trial quantum counts for histogram comparison
                 from nonogram import quantum_solve
+
                 qu_counts_list: list[dict] = []
                 for _ in range(trials):
                     try:
@@ -219,18 +238,25 @@ def api_benchmark():
                 per_trial = qu_counts_list if len(qu_counts_list) > 1 else None
                 chart_b64 = render_chart_b64(report, cl_times, qu_times)
                 payload = _build_payload(
-                    report, solutions, raw_counts, rows, cols, trials,
-                    cl_times, qu_times, chart_b64,
-                    row_clues=row_clues, col_clues=col_clues,
+                    report,
+                    solutions,
+                    raw_counts,
+                    rows,
+                    cols,
+                    trials,
+                    cl_times,
+                    qu_times,
+                    chart_b64,
+                    row_clues=row_clues,
+                    col_clues=col_clues,
                     qu_counts_per_trial=per_trial,
                 )
                 _save_run(payload)
                 socketio.emit("bench_done", payload)
-                emit_status(
-                    f"Benchmark complete ({label}) \u2014 metrics and chart below.",
-                    "ok")
+                emit_status(f"Benchmark complete ({label}) \u2014 metrics and chart below.", "ok")
         except Exception as exc:
             from tools.state import socketio
+
             socketio.emit("solver_error", {"message": str(exc)})
             emit_status(f"Benchmark error: {exc}", "err")
         finally:

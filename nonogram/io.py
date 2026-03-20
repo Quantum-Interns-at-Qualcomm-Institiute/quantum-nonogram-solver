@@ -53,16 +53,21 @@ _MAX_LINE = 6  # matches existing data.py lookup table
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _validate_clues(row_clues: list, col_clues: list) -> None:
     """Raise ValidationError if clues are obviously malformed."""
     for i, clue in enumerate(row_clues):
         for v in clue:
             if not isinstance(v, int) or v < 0:
-                raise ValidationError(f"row_clues[{i}] contains non-integer or negative value: {v!r}")
+                raise ValidationError(
+                    f"row_clues[{i}] contains non-integer or negative value: {v!r}"
+                )
     for j, clue in enumerate(col_clues):
         for v in clue:
             if not isinstance(v, int) or v < 0:
-                raise ValidationError(f"col_clues[{j}] contains non-integer or negative value: {v!r}")
+                raise ValidationError(
+                    f"col_clues[{j}] contains non-integer or negative value: {v!r}"
+                )
     if len(row_clues) > _MAX_LINE or len(col_clues) > _MAX_LINE:
         raise ValidationError(
             f"Puzzle exceeds maximum supported size ({_MAX_LINE}×{_MAX_LINE}). "
@@ -86,6 +91,7 @@ def _to_serialisable(clues: list) -> list[list[int]]:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def save_puzzle(
     row_clues: list,

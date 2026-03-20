@@ -36,6 +36,7 @@ Flask + Socket.IO web interface for interactive nonogram solving.
   - Max grid size: 6x6 (limited by data.py lookup table)
   - Max clues per line: 3 blocks
 """
+
 from __future__ import annotations
 
 import os
@@ -49,13 +50,13 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT))
 
-from flask import Flask
-from flask_cors import CORS
-from flask_socketio import SocketIO
+from flask import Flask  # noqa: E402
+from flask_cors import CORS  # noqa: E402
+from flask_socketio import SocketIO  # noqa: E402
 
-from tools import state as app_state
-from tools.config import MAX_CLUES, MAX_GRID
-from tools.routes import ALL_BLUEPRINTS
+from tools import state as app_state  # noqa: E402
+from tools.config import MAX_CLUES, MAX_GRID  # noqa: E402
+from tools.routes import ALL_BLUEPRINTS  # noqa: E402
 
 # ── Flask setup ──────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -73,18 +74,22 @@ for bp in ALL_BLUEPRINTS:
 
 # ── Config API (frontend lives in the website repo) ──────────────────────────
 
+
 @app.route("/api/config")
 def api_config():
     """Return solver configuration for the static frontend."""
     from flask import jsonify
+
     return jsonify({"max_clues": MAX_CLUES, "max_grid": MAX_GRID})
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
 
+
 def _get_ssl_context():
     """Return (cert, key) paths if dev certs exist, else None."""
     from pathlib import Path
+
     for d in [
         Path(os.environ.get("DEV_CERT_DIR", "")),
         Path(__file__).resolve().parents[2] / ".certs",
@@ -102,5 +107,6 @@ if __name__ == "__main__":
     threading.Timer(1.2, lambda: webbrowser.open(f"{scheme}://localhost:{PORT}")).start()
     print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")
     HOST = os.environ.get("NONOGRAM_HOST", "0.0.0.0")
-    socketio.run(app, host=HOST, port=PORT, debug=False, allow_unsafe_werkzeug=True,
-                 ssl_context=ssl_ctx)
+    socketio.run(
+        app, host=HOST, port=PORT, debug=False, allow_unsafe_werkzeug=True, ssl_context=ssl_ctx
+    )

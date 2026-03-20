@@ -367,16 +367,14 @@ def puzzle_to_boolean(
     # --- row constraints ---
     for r_idx, r_clue in enumerate(row_clues):
         var_indices = [r_v[r_idx][c] for c in range(d)]
-        bool_expr, cl_clauses = _encode_constraint(
-            r_clue, d, var_indices, f"Row {r_idx + 1}")
+        bool_expr, cl_clauses = _encode_constraint(r_clue, d, var_indices, f"Row {r_idx + 1}")
         boolean_statement += bool_expr
         classical_statement.append(cl_clauses)
 
     # --- column constraints ---
     for c_idx, c_clue in enumerate(col_clues):
         var_indices = [r_v[r][c_idx] for r in range(n)]
-        bool_expr, cl_clauses = _encode_constraint(
-            c_clue, n, var_indices, f"Column {c_idx + 1}")
+        bool_expr, cl_clauses = _encode_constraint(c_clue, n, var_indices, f"Column {c_idx + 1}")
         boolean_statement += bool_expr
         classical_statement.append(cl_clauses)
 

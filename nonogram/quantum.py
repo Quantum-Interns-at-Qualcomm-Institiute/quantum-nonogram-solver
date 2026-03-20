@@ -28,10 +28,10 @@ from __future__ import annotations
 from nonogram.core import puzzle_to_boolean
 from nonogram.errors import HardwareError, QuantumSolverError
 
-
 # ---------------------------------------------------------------------------
 # Local simulator path
 # ---------------------------------------------------------------------------
+
 
 def quantum_solve(puzzle: tuple[list, list]):
     """Solve a nonogram using Grover's algorithm on a local statevector simulator.
@@ -49,15 +49,16 @@ def quantum_solve(puzzle: tuple[list, list]):
     from qiskit_algorithms import AmplificationProblem, Grover
 
     expression = puzzle_to_boolean(row_clues=puzzle[0], col_clues=puzzle[1])
-    oracle  = PhaseOracleGate(expression)
-    problem = AmplificationProblem(oracle)   # auto-infers is_good_state
-    grover  = Grover(sampler=StatevectorSampler())
+    oracle = PhaseOracleGate(expression)
+    problem = AmplificationProblem(oracle)  # auto-infers is_good_state
+    grover = Grover(sampler=StatevectorSampler())
     return grover.amplify(problem)
 
 
 # ---------------------------------------------------------------------------
 # Real hardware path (IBM Qiskit Runtime)
 # ---------------------------------------------------------------------------
+
 
 def quantum_solve_hardware(
     puzzle: tuple[list, list],
@@ -142,11 +143,11 @@ def quantum_solve_hardware(
 
     # ── Build Grover circuit ─────────────────────────────────────────────
     expression = puzzle_to_boolean(row_clues=puzzle[0], col_clues=puzzle[1])
-    oracle  = PhaseOracleGate(expression)
+    oracle = PhaseOracleGate(expression)
     problem = AmplificationProblem(oracle)
 
     # construct_circuit returns an unmeasured QuantumCircuit; we add measurements.
-    grover  = Grover(iterations=iterations)
+    grover = Grover(iterations=iterations)
     circuit = grover.construct_circuit(problem, measurement=True)
 
     # ── Transpile for the target backend ────────────────────────────────
@@ -178,19 +179,19 @@ def quantum_solve_hardware(
             # XpXm sequence works well across IBM Eagle/Heron backends.
             sampler.options.dynamical_decoupling.sequence_type = "XpXm"
         except Exception:
-            pass   # option not supported by this runtime version — skip silently
+            pass  # option not supported by this runtime version — skip silently
 
     # Pauli gate + measurement twirling converts coherent errors into
     # depolarising noise, which is easier to characterise and average away.
     if twirling:
         try:
-            sampler.options.twirling.enable_gates   = True
+            sampler.options.twirling.enable_gates = True
             sampler.options.twirling.enable_measure = True
         except Exception:
-            pass   # option not supported — skip silently
+            pass  # option not supported — skip silently
 
-    job    = sampler.run([transpiled])
-    result = job.result()   # blocks until IBM job is complete
+    job = sampler.run([transpiled])
+    result = job.result()  # blocks until IBM job is complete
 
     counts = extract_counts(result[0].data, creg_names)
     return counts, backend.name
@@ -297,6 +298,7 @@ def extract_counts(data, creg_names: list[str]) -> dict[str, int]:
 # Backend enumeration helper (used by the GUI settings dialog)
 # ---------------------------------------------------------------------------
 
+
 def list_backends(
     token: str,
     channel: str = "ibm_quantum_platform",
@@ -313,7 +315,7 @@ def list_backends(
     """
     from qiskit_ibm_runtime import QiskitRuntimeService
 
-    service  = QiskitRuntimeService(channel=channel, token=token)
+    service = QiskitRuntimeService(channel=channel, token=token)
     backends = service.backends(operational=True)
 
     info: list[tuple[str, int, int]] = []

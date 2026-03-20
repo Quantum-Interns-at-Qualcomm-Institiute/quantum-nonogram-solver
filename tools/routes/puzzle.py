@@ -1,4 +1,5 @@
 """Puzzle I/O routes: load and save puzzles."""
+
 from __future__ import annotations
 
 import io
@@ -17,8 +18,11 @@ def api_puzzle_load():
     f = request.files.get("file")
     if not f:
         return jsonify({"error": "No file"}), 400
-    import tempfile, os
+    import os
+    import tempfile
+
     from nonogram.io import load_puzzle
+
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         f.save(tmp.name)
         try:
@@ -31,15 +35,16 @@ def api_puzzle_load():
         state["puzzle_name"] = data.get("name", "puzzle") or "puzzle"
         state["rows"] = len(row_clues)
         state["cols"] = len(col_clues)
-        state["grid"] = [[False] * len(col_clues)
-                         for _ in range(len(row_clues))]
-    return jsonify({
-        "name": state["puzzle_name"],
-        "rows": state["rows"],
-        "cols": state["cols"],
-        "row_clues": row_clues,
-        "col_clues": col_clues,
-    })
+        state["grid"] = [[False] * len(col_clues) for _ in range(len(row_clues))]
+    return jsonify(
+        {
+            "name": state["puzzle_name"],
+            "rows": state["rows"],
+            "cols": state["cols"],
+            "row_clues": row_clues,
+            "col_clues": col_clues,
+        }
+    )
 
 
 @bp.route("/api/puzzle/save", methods=["POST"])
@@ -59,6 +64,6 @@ def api_puzzle_save():
     }
     buf.write(json.dumps(payload, indent=2).encode())
     buf.seek(0)
-    return send_file(buf, mimetype="application/json",
-                     as_attachment=True,
-                     download_name=f"{name}.non.json")
+    return send_file(
+        buf, mimetype="application/json", as_attachment=True, download_name=f"{name}.non.json"
+    )

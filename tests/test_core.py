@@ -7,10 +7,10 @@ import pytest
 
 from nonogram.core import display_nonogram, puzzle_to_boolean, validate, var_clauses
 
-
 # ---------------------------------------------------------------------------
 # var_clauses
 # ---------------------------------------------------------------------------
+
 
 class TestVarClauses:
     def test_square_shape(self):
@@ -49,6 +49,7 @@ class TestVarClauses:
 # validate
 # ---------------------------------------------------------------------------
 
+
 class TestValidate:
     def test_valid_input(self):
         assert validate(2, 3, [(1,), (1,)], [(1,), (1,), (1,)]) is True
@@ -65,6 +66,7 @@ class TestValidate:
 # ---------------------------------------------------------------------------
 # display_nonogram
 # ---------------------------------------------------------------------------
+
 
 class TestDisplayNonogram:
     def _capture(self, bit_string, n, d):
@@ -98,6 +100,7 @@ class TestDisplayNonogram:
 # ---------------------------------------------------------------------------
 # puzzle_to_boolean
 # ---------------------------------------------------------------------------
+
 
 class TestPuzzleToBooleanQuantum:
     """Tests for the default (quantum/string) output."""

@@ -8,13 +8,13 @@ Defines the ``Solver`` abstract base class and two implementations:
 The ``benchmark()`` function in ``nonogram.metrics`` accepts any ``Solver`` instance,
 enabling new backends to be added without modifying the benchmarking code.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
 
 from nonogram.errors import ClassicalSolverError, HardwareError, QuantumSolverError
-
 
 Puzzle = tuple[list, list]
 """Type alias for (row_clues, col_clues)."""
@@ -55,6 +55,7 @@ class ClassicalSolver(Solver):
     def solve(self, puzzle: Puzzle) -> dict[str, Any]:
         try:
             from nonogram.classical import classical_solve
+
             solutions = classical_solve(puzzle)
         except Exception as exc:
             raise ClassicalSolverError(str(exc)) from exc
@@ -71,6 +72,7 @@ class QuantumSimulatorSolver(Solver):
     def solve(self, puzzle: Puzzle) -> dict[str, Any]:
         try:
             from nonogram.quantum import quantum_solve
+
             result = quantum_solve(puzzle)
             counts = result.circuit_results[0]
         except QuantumSolverError:
@@ -102,6 +104,7 @@ class QuantumHardwareSolver(Solver):
     def solve(self, puzzle: Puzzle) -> dict[str, Any]:
         try:
             from nonogram.quantum import quantum_solve_hardware
+
             counts, backend_name = quantum_solve_hardware(
                 puzzle,
                 token=self._token,

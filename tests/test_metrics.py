@@ -5,8 +5,8 @@ guarded with a skipif marker.  All structural / math tests run without any
 quantum dependencies.
 """
 
-import math
 import io
+import math
 import sys
 
 import pytest
@@ -23,7 +23,7 @@ from nonogram.metrics import (
 # Helpers / shared fixtures
 # ---------------------------------------------------------------------------
 
-SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])   # 2×2, 4 variables
+SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2×2, 4 variables
 SMALL_SOLUTION = "1001"
 
 
@@ -56,6 +56,7 @@ def _make_quantum() -> QuantumMetrics:
 # ClassicalMetrics
 # ---------------------------------------------------------------------------
 
+
 class TestClassicalMetrics:
     def test_configs_per_second_computed(self):
         cm = _make_classical()
@@ -75,9 +76,10 @@ class TestClassicalMetrics:
 # ComparisonReport derived fields
 # ---------------------------------------------------------------------------
 
+
 class TestComparisonReport:
     def _report(self, c=None, q=None, n_vars=4):
-        search_space = 2 ** n_vars
+        search_space = 2**n_vars
         return ComparisonReport(
             rows=2,
             cols=2,
@@ -93,8 +95,8 @@ class TestComparisonReport:
         assert r.theoretical_grover_speedup == pytest.approx(math.sqrt(16))
 
     def test_actual_speedup_computed_correctly(self):
-        c = _make_classical()   # 2.0 s
-        q = _make_quantum()     # 0.5 s
+        c = _make_classical()  # 2.0 s
+        q = _make_quantum()  # 0.5 s
         r = self._report(c=c, q=q)
         assert r.actual_speedup == pytest.approx(4.0)
 
@@ -107,20 +109,21 @@ class TestComparisonReport:
         assert r.actual_speedup == 0.0
 
     def test_quantum_advantage_ratio(self):
-        c = _make_classical()   # 2.0 s
-        q = _make_quantum()     # 0.5 s  → actual_speedup = 4.0
+        c = _make_classical()  # 2.0 s
+        q = _make_quantum()  # 0.5 s  → actual_speedup = 4.0
         r = self._report(c=c, q=q, n_vars=4)
         # theoretical = sqrt(16) = 4.0 → ratio = 4.0/4.0 = 1.0
         assert r.quantum_advantage_ratio == pytest.approx(1.0)
 
     def test_large_search_space_theoretical_speedup(self):
         r = self._report(n_vars=24)
-        assert r.theoretical_grover_speedup == pytest.approx(math.sqrt(2 ** 24))
+        assert r.theoretical_grover_speedup == pytest.approx(math.sqrt(2**24))
 
 
 # ---------------------------------------------------------------------------
 # benchmark() — classical-only path (fast, no qiskit)
 # ---------------------------------------------------------------------------
+
 
 class TestBenchmarkClassicalOnly:
     def test_returns_comparison_report(self):
@@ -138,7 +141,7 @@ class TestBenchmarkClassicalOnly:
 
     def test_search_space_correct(self):
         result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.search_space_size == 2 ** 4  # 2×2 puzzle
+        assert result.search_space_size == 2**4  # 2×2 puzzle
 
     def test_solutions_found(self):
         result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
@@ -165,6 +168,7 @@ class TestBenchmarkClassicalOnly:
 # ---------------------------------------------------------------------------
 # print_report() — output structure tests (no quantum needed)
 # ---------------------------------------------------------------------------
+
 
 class TestPrintReport:
     def _capture_report(self, report: ComparisonReport) -> str:
@@ -196,8 +200,13 @@ class TestPrintReport:
         c = _make_classical()
         q = _make_quantum()
         report = ComparisonReport(
-            rows=2, cols=2, num_variables=4, search_space_size=16,
-            boolean_expression_length=100, classical=c, quantum=q,
+            rows=2,
+            cols=2,
+            num_variables=4,
+            search_space_size=16,
+            boolean_expression_length=100,
+            classical=c,
+            quantum=q,
         )
         output = self._capture_report(report)
         assert "Theoretical Grover speedup" in output

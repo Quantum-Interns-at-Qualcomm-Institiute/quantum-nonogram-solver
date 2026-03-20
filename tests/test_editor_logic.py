@@ -10,14 +10,13 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
-from nonogram.core import rle as _rle, grid_to_clues
-
+from nonogram.core import grid_to_clues
+from nonogram.core import rle as _rle
 
 # ===========================================================================
 # _rle — run-length encode a boolean sequence
 # ===========================================================================
+
 
 class TestRle:
     # --- basic correctness ---
@@ -89,6 +88,7 @@ class TestRle:
 # grid_to_clues — derive row and column clues from a 2-D boolean grid
 # ===========================================================================
 
+
 def _grid(rows: list[list[bool]]) -> list[list[bool]]:
     """Convenience: just return the nested list unchanged."""
     return rows
@@ -134,7 +134,7 @@ class TestGridToClues:
 
     def test_diagonal_2x2(self):
         grid = [
-            [True,  False],
+            [True, False],
             [False, True],
         ]
         row_clues, col_clues = grid_to_clues(grid)
@@ -148,7 +148,7 @@ class TestGridToClues:
         ]
         row_clues, col_clues = grid_to_clues(grid)
         assert row_clues[0] == (3,)
-        assert row_clues[1] == (0,)   # empty row
+        assert row_clues[1] == (0,)  # empty row
         assert all(c == (1,) for c in col_clues)
 
     def test_checkerboard_3x3(self):
@@ -156,9 +156,9 @@ class TestGridToClues:
         #  F T F
         #  T F T
         grid = [
-            [True,  False, True],
-            [False, True,  False],
-            [True,  False, True],
+            [True, False, True],
+            [False, True, False],
+            [True, False, True],
         ]
         row_clues, col_clues = grid_to_clues(grid)
         # each row: two isolated cells → (1, 1) for rows 0 and 2; single cell for row 1
@@ -189,7 +189,7 @@ class TestGridToClues:
         from nonogram.classical import classical_solve
 
         grid = [
-            [True,  False],
+            [True, False],
             [False, True],
         ]
         row_clues, col_clues = grid_to_clues(grid)

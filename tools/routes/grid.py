@@ -1,4 +1,5 @@
 """Grid state routes: update grid, randomize."""
+
 from __future__ import annotations
 
 import random

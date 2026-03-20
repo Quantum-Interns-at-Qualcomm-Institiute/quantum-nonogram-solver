@@ -20,12 +20,12 @@ import time
 import tracemalloc
 from dataclasses import dataclass, field
 
-from nonogram.core import puzzle_to_boolean, var_clauses
-
+from nonogram.core import puzzle_to_boolean
 
 # ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ClassicalMetrics:
@@ -141,6 +141,7 @@ class ComparisonReport:
 # Benchmark runner
 # ---------------------------------------------------------------------------
 
+
 def benchmark(
     puzzle: tuple[list, list],
     run_classical: bool = True,
@@ -167,7 +168,7 @@ def benchmark(
     row_clues, col_clues = puzzle
     n, d = len(row_clues), len(col_clues)
     num_vars = n * d
-    search_space = 2 ** num_vars
+    search_space = 2**num_vars
 
     # Build the boolean expression once (shared cost)
     expression = puzzle_to_boolean(row_clues, col_clues, classical=False)
@@ -228,9 +229,7 @@ def benchmark(
         # BooleanExpression.simulate() expects variable order x0, x1, ...
         # so we reverse each bitstring before evaluating.
         oracle_correct = bool_expr.simulate(top_bitstring[::-1])
-        valid_solutions = sum(
-            1 for bs in top_counts if bool_expr.simulate(bs[::-1])
-        )
+        valid_solutions = sum(1 for bs in top_counts if bool_expr.simulate(bs[::-1]))
 
         quantum_metrics = QuantumMetrics(
             solve_time_s=elapsed,
@@ -261,9 +260,9 @@ def benchmark(
 # Report printer
 # ---------------------------------------------------------------------------
 
+
 def print_report(report: ComparisonReport) -> None:
     """Print a formatted side-by-side comparison of the benchmark results."""
-    SEP = "─" * 62
     W = 28  # column width for value fields
 
     def row(label: str, classical_val: str, quantum_val: str) -> str:
@@ -296,46 +295,42 @@ def print_report(report: ComparisonReport) -> None:
         return format(val, fmt_str) + unit
 
     # Timing
-    print(row("Solve time (s)",
-              fmt(c and c.solve_time_s, ".4f", " s"),
-              fmt(q and q.solve_time_s, ".4f", " s")))
-    print(row("Peak memory (KB)",
-              fmt(c and c.peak_memory_kb, ",.1f", " KB"),
-              fmt(q and q.peak_memory_kb, ",.1f", " KB")))
-    print(row("Solutions found",
-              fmt(c and c.solutions_found, "d"),
-              fmt(q and q.solutions_found, "d")))
+    print(
+        row(
+            "Solve time (s)",
+            fmt(c and c.solve_time_s, ".4f", " s"),
+            fmt(q and q.solve_time_s, ".4f", " s"),
+        )
+    )
+    print(
+        row(
+            "Peak memory (KB)",
+            fmt(c and c.peak_memory_kb, ",.1f", " KB"),
+            fmt(q and q.peak_memory_kb, ",.1f", " KB"),
+        )
+    )
+    print(
+        row("Solutions found", fmt(c and c.solutions_found, "d"), fmt(q and q.solutions_found, "d"))
+    )
 
     # Classical-specific
-    print(row("Configs evaluated",
-              fmt(c and c.configurations_evaluated, ",d"),
-              "N/A"))
-    print(row("Throughput (configs/s)",
-              fmt(c and c.configs_per_second, ",.0f"),
-              "N/A"))
+    print(row("Configs evaluated", fmt(c and c.configurations_evaluated, ",d"), "N/A"))
+    print(row("Throughput (configs/s)", fmt(c and c.configs_per_second, ",.0f"), "N/A"))
 
     # Quantum-specific
-    print(row("Qubits",
-              "N/A",
-              fmt(q and q.num_qubits, "d")))
-    print(row("Circuit depth",
-              "N/A",
-              fmt(q and q.circuit_depth, ",d")))
-    print(row("Total gates",
-              "N/A",
-              fmt(q and q.total_gate_count, ",d")))
-    print(row("2-qubit (entangling) gates",
-              "N/A",
-              fmt(q and q.two_qubit_gate_count, ",d")))
-    print(row("Grover iterations",
-              "N/A",
-              fmt(q and q.grover_iterations, "d")))
-    print(row("Top-state probability",
-              "N/A",
-              fmt(q and q.top_result_probability, ".2%")))
-    print(row("Oracle validation",
-              "N/A",
-              "✓ correct" if q and q.oracle_evaluation_correct else ("✗ wrong" if q else "—")))
+    print(row("Qubits", "N/A", fmt(q and q.num_qubits, "d")))
+    print(row("Circuit depth", "N/A", fmt(q and q.circuit_depth, ",d")))
+    print(row("Total gates", "N/A", fmt(q and q.total_gate_count, ",d")))
+    print(row("2-qubit (entangling) gates", "N/A", fmt(q and q.two_qubit_gate_count, ",d")))
+    print(row("Grover iterations", "N/A", fmt(q and q.grover_iterations, "d")))
+    print(row("Top-state probability", "N/A", fmt(q and q.top_result_probability, ".2%")))
+    print(
+        row(
+            "Oracle validation",
+            "N/A",
+            "✓ correct" if q and q.oracle_evaluation_correct else ("✗ wrong" if q else "—"),
+        )
+    )
 
     if q and q.gate_counts_by_type:
         top_gates = sorted(q.gate_counts_by_type.items(), key=lambda x: -x[1])[:5]
@@ -345,13 +340,17 @@ def print_report(report: ComparisonReport) -> None:
     # Comparison
     if c and q:
         print(section("Comparison"))
-        print(row("Theoretical Grover speedup",
-                  f"√{report.search_space_size:,}",
-                  f"≈{report.theoretical_grover_speedup:,.0f}×"))
-        print(row("Actual speedup",
-                  f"{report.actual_speedup:,.1f}×", ""))
-        print(row("Advantage ratio (actual/theoretical)",
-                  f"{report.quantum_advantage_ratio:.3f}", ""))
+        print(
+            row(
+                "Theoretical Grover speedup",
+                f"√{report.search_space_size:,}",
+                f"≈{report.theoretical_grover_speedup:,.0f}×",
+            )
+        )
+        print(row("Actual speedup", f"{report.actual_speedup:,.1f}×", ""))
+        print(
+            row("Advantage ratio (actual/theoretical)", f"{report.quantum_advantage_ratio:.3f}", "")
+        )
         classical_oracle = c.configurations_evaluated
         grover_oracle = report.quantum.grover_iterations if q else 0
         print(row("Classical oracle calls", f"{classical_oracle:,}", ""))

@@ -1,4 +1,5 @@
 """Shared constants for the nonogram web app."""
+
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
