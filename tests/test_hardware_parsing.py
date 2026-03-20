@@ -14,16 +14,16 @@ Two targeted tests for the IBM hardware integration:
       Makes exactly ONE API call.  No circuits are run, no compute credits
       are consumed.
 """
+
 import dataclasses
 
 import pytest
-
 from conftest import load_ibm_token
-
 
 # ---------------------------------------------------------------------------
 # Test 1: DataBin parsing logic (ZERO API cost — pure Python mock)
 # ---------------------------------------------------------------------------
+
 
 def test_databin_parsing_logic():
     """The extraction loop in quantum_solve_hardware must handle any field name.
@@ -34,18 +34,18 @@ def test_databin_parsing_logic():
 
     Both should yield the injected counts dict without error.
     """
+
     # Build a fake BitArray with get_counts()
     class _FakeBitArray:
         def __init__(self, counts):
             self._counts = counts
+
         def get_counts(self):
             return dict(self._counts)
 
     # Build a fake DataBin as a plain dataclass (same interface as the real one)
     def _run_extraction(field_name: str, expected_counts: dict) -> dict:
-        DataBinCls = dataclasses.make_dataclass(
-            "DataBin", [(field_name, object)]
-        )
+        DataBinCls = dataclasses.make_dataclass("DataBin", [(field_name, object)])
         data = DataBinCls(**{field_name: _FakeBitArray(expected_counts)})
 
         # ── same logic as quantum_solve_hardware ──────────────────────
@@ -96,6 +96,7 @@ def test_databin_parsing_logic():
 # Test 2: list_backends() auth (1 REST call, zero compute cost)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.skipif(
     load_ibm_token() is None,
     reason="IBM_QUANTUM_TOKEN env var not set and .env not found",
@@ -106,13 +107,13 @@ def test_list_backends_auth():
     Uses ibm_quantum_platform channel (qiskit-ibm-runtime >= 0.30).
     Makes exactly ONE REST call.  No circuits run, no compute credits used.
     """
-    pytest.importorskip("qiskit_ibm_runtime",
-                        reason="qiskit-ibm-runtime not installed")
+    pytest.importorskip("qiskit_ibm_runtime", reason="qiskit-ibm-runtime not installed")
 
     token = load_ibm_token()
     assert token, "Token is empty after parsing .env"
 
     from nonogram.quantum import list_backends
+
     backends = list_backends(token, channel="ibm_quantum_platform")
 
     assert isinstance(backends, list), "list_backends should return a list"

@@ -6,12 +6,12 @@ Integration tests for the Flask route blueprints.
 Uses Flask's test client — no real server, no Socket.IO transport needed.
 All solver routes are tested with mocked solvers to avoid slow computation.
 """
+
 from __future__ import annotations
 
 import json
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -23,11 +23,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def app():
     """Create a Flask app wired with all blueprints and a test SocketIO."""
     from flask import Flask
     from flask_socketio import SocketIO
+
     from tools import state as app_state
     from tools.routes import ALL_BLUEPRINTS
 
@@ -46,13 +48,16 @@ def app():
         test_app.register_blueprint(bp)
 
     # Reset state before each test
-    app_state.state.update({
-        "rows": 4, "cols": 4,
-        "grid": [[False] * 4 for _ in range(4)],
-        "hw_config": None,
-        "busy": False,
-        "puzzle_name": "puzzle",
-    })
+    app_state.state.update(
+        {
+            "rows": 4,
+            "cols": 4,
+            "grid": [[False] * 4 for _ in range(4)],
+            "hw_config": None,
+            "busy": False,
+            "puzzle_name": "puzzle",
+        }
+    )
 
     yield test_app
 
@@ -66,6 +71,7 @@ def client(app):
 # Grid routes
 # ---------------------------------------------------------------------------
 
+
 class TestGridRoutes:
     def test_update_grid(self, client):
         resp = client.post("/api/grid", json={"rows": 3, "cols": 3})
@@ -77,6 +83,7 @@ class TestGridRoutes:
         assert resp.status_code == 200
         from tools.config import MAX_GRID
         from tools.state import state
+
         assert state["rows"] == MAX_GRID
         assert state["cols"] == MAX_GRID
 
@@ -84,6 +91,7 @@ class TestGridRoutes:
         resp = client.post("/api/grid", json={"rows": 0, "cols": -1})
         assert resp.status_code == 200
         from tools.state import state
+
         assert state["rows"] == 1
         assert state["cols"] == 1
 
@@ -108,6 +116,7 @@ class TestGridRoutes:
 # Puzzle routes
 # ---------------------------------------------------------------------------
 
+
 class TestPuzzleRoutes:
     def test_save_puzzle(self, client):
         payload = {
@@ -125,7 +134,8 @@ class TestPuzzleRoutes:
     def test_load_puzzle(self, client, tmp_path):
         puzzle = {
             "name": "loaded",
-            "rows": 2, "cols": 2,
+            "rows": 2,
+            "cols": 2,
             "row_clues": [[1], [1]],
             "col_clues": [[1], [1]],
         }
@@ -133,6 +143,7 @@ class TestPuzzleRoutes:
         puzzle_file.write_text(json.dumps(puzzle))
 
         from io import BytesIO
+
         with open(puzzle_file, "rb") as f:
             data = BytesIO(f.read())
         data.seek(0)
@@ -155,6 +166,7 @@ class TestPuzzleRoutes:
 # ---------------------------------------------------------------------------
 # Solver routes
 # ---------------------------------------------------------------------------
+
 
 class TestSolverRoutes:
     def test_classical_solve_returns_ok(self, client):
@@ -180,6 +192,7 @@ class TestSolverRoutes:
     def test_solver_busy_rejection(self, client):
         """Solver endpoints reject requests when busy."""
         from tools.state import state, state_lock
+
         with state_lock:
             state["busy"] = True
 
@@ -215,6 +228,7 @@ class TestSolverRoutes:
 # Hardware routes
 # ---------------------------------------------------------------------------
 
+
 class TestHardwareRoutes:
     def test_hw_config_connect_disconnect(self, client):
         cfg = {
@@ -227,6 +241,7 @@ class TestHardwareRoutes:
         assert resp.status_code == 200
 
         from tools.state import state
+
         assert state["hw_config"] is not None
         assert state["hw_config"]["backend_name"] == "ibm_test"
 
@@ -241,10 +256,13 @@ class TestHardwareRoutes:
 
     def test_hw_backends_missing_runtime(self, client):
         """Backends endpoint returns 400 when qiskit-ibm-runtime errors."""
-        resp = client.post("/api/hw/backends", json={
-            "token": "bad-token",
-            "channel": "ibm_quantum_platform",
-        })
+        resp = client.post(
+            "/api/hw/backends",
+            json={
+                "token": "bad-token",
+                "channel": "ibm_quantum_platform",
+            },
+        )
         # Should return 400 with an error message (auth will fail)
         assert resp.status_code == 400
         assert "error" in resp.get_json()
@@ -253,6 +271,7 @@ class TestHardwareRoutes:
 # ---------------------------------------------------------------------------
 # Runs routes
 # ---------------------------------------------------------------------------
+
 
 class TestRunsRoutes:
     def test_runs_info(self, client):
@@ -269,6 +288,7 @@ class TestRunsRoutes:
 
     def test_runs_delete_rejected_when_busy(self, client):
         from tools.state import state, state_lock
+
         with state_lock:
             state["busy"] = True
 

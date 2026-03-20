@@ -1,4 +1,5 @@
 """Run cache routes: info, delete."""
+
 from __future__ import annotations
 
 import json
@@ -25,12 +26,14 @@ def api_runs_info():
                 timestamps.append(d["timestamp"])
         except Exception:
             pass
-    return jsonify({
-        "count": len(files),
-        "total_bytes": total_bytes,
-        "oldest": min(timestamps) if timestamps else None,
-        "newest": max(timestamps) if timestamps else None,
-    })
+    return jsonify(
+        {
+            "count": len(files),
+            "total_bytes": total_bytes,
+            "oldest": min(timestamps) if timestamps else None,
+            "newest": max(timestamps) if timestamps else None,
+        }
+    )
 
 
 @bp.route("/api/runs/delete", methods=["POST"])

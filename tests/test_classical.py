@@ -4,10 +4,10 @@ import pytest
 
 from nonogram.classical import classical_solve
 
-
 # ---------------------------------------------------------------------------
 # Small known puzzles
 # ---------------------------------------------------------------------------
+
 
 class TestClassicalSolveSmall:
     """Use tiny puzzles where exhaustive search is instantaneous."""
@@ -48,6 +48,7 @@ class TestClassicalSolveSmall:
 # manual_check path
 # ---------------------------------------------------------------------------
 
+
 class TestManualCheck:
     def test_correct_solution_is_accepted(self):
         # 2x2, row=(1,),(1,), col=(1,),(1,) — one of the two solutions
@@ -69,6 +70,7 @@ class TestManualCheck:
 # ---------------------------------------------------------------------------
 # Demo puzzle (4×6) — known solution from the notebook
 # ---------------------------------------------------------------------------
+
 
 class TestDemoPuzzle:
     PUZZLE = (

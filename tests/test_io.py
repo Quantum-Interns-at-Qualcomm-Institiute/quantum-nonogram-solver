@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from nonogram.errors import PuzzleIOError, ValidationError
+from nonogram.errors import PuzzleIOError
 from nonogram.io import (
     _slugify,
     _to_serialisable,
@@ -29,7 +29,6 @@ from nonogram.io import (
     save_batch,
     save_puzzle,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,6 +44,7 @@ MULTI_GROUP_COL = [(1,), (2,)]
 # ===========================================================================
 # _slugify
 # ===========================================================================
+
 
 class TestSlugify:
     def test_basic_name(self):
@@ -77,6 +77,7 @@ class TestSlugify:
 # _to_serialisable
 # ===========================================================================
 
+
 class TestToSerialisable:
     def test_list_of_tuples(self):
         assert _to_serialisable([(1, 2), (3,)]) == [[1, 2], [3]]
@@ -101,6 +102,7 @@ class TestToSerialisable:
 # ===========================================================================
 # _validate_clues
 # ===========================================================================
+
 
 class TestValidateClues:
     def test_valid_simple_clues(self):
@@ -141,6 +143,7 @@ class TestValidateClues:
 # ===========================================================================
 # save_puzzle / load_puzzle — roundtrip
 # ===========================================================================
+
 
 class TestSavePuzzle:
     def test_creates_file(self, tmp_path):
@@ -256,10 +259,14 @@ class TestLoadPuzzle:
 
     def test_missing_optional_keys_get_defaults(self, tmp_path):
         dest = tmp_path / "bare.non.json"
-        dest.write_text(json.dumps({
-            "row_clues": [[1], [1]],
-            "col_clues": [[1], [1]],
-        }))
+        dest.write_text(
+            json.dumps(
+                {
+                    "row_clues": [[1], [1]],
+                    "col_clues": [[1], [1]],
+                }
+            )
+        )
         data = load_puzzle(dest)
         assert data["tags"] == []
         assert data["created"] == ""
@@ -301,6 +308,7 @@ class TestSaveLoadRoundtrip:
     def test_loaded_clues_usable_by_solver(self, tmp_path):
         """The solver must accept clues straight from load_puzzle."""
         from nonogram.classical import classical_solve
+
         row_clues = [(1,), (1,)]
         col_clues = [(1,), (1,)]
         dest = tmp_path / "p.non.json"
@@ -318,7 +326,7 @@ class TestSaveLoadRoundtrip:
 
 BATCH_PUZZLES = [
     {"name": "Alpha", "row_clues": [(1,), (1,)], "col_clues": [(1,), (1,)]},
-    {"name": "Beta",  "row_clues": [(2,), (0,)], "col_clues": [(1,), (1,)]},
+    {"name": "Beta", "row_clues": [(2,), (0,)], "col_clues": [(1,), (1,)]},
     {"name": "Gamma", "row_clues": [(1, 1), (0,)], "col_clues": [(1,), (1,)]},
 ]
 
@@ -406,6 +414,7 @@ class TestSaveBatchLoadBatchRoundtrip:
 
     def test_solver_can_use_batch_loaded_clues(self, tmp_path):
         from nonogram.classical import classical_solve
+
         puzzles = [{"name": "T", "row_clues": [(1,), (1,)], "col_clues": [(1,), (1,)]}]
         save_batch(puzzles, tmp_path)
         loaded = load_batch(tmp_path)

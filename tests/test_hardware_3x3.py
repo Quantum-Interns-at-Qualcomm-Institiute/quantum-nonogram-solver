@@ -39,8 +39,8 @@ Shots:     512  (enough to verify the pipeline returns valid counts)
 
 Run:  pytest tests/test_hardware_3x3.py -v -s
 """
-import pytest
 
+import pytest
 from conftest import load_ibm_token
 
 
@@ -64,9 +64,9 @@ def test_hardware_3x3_pipeline():
     from nonogram.quantum import quantum_solve_hardware
 
     row_clues = [(3,), (3,), (3,)]
-    col_clues  = [(3,), (3,), (3,)]
+    col_clues = [(3,), (3,), (3,)]
 
-    SHOTS = 512   # minimal shots to verify the pipeline
+    SHOTS = 512  # minimal shots to verify the pipeline
 
     print("\nSubmitting 3×3 all-3s puzzle to IBM quantum hardware (pipeline test)…")
     print("Note: circuit depth ≈ 2 900 — result will be near-uniform noise.")
@@ -78,7 +78,7 @@ def test_hardware_3x3_pipeline():
         token=token,
         channel="ibm_quantum_platform",
         shots=SHOTS,
-        iterations=1,           # keep circuit as shallow as possible
+        iterations=1,  # keep circuit as shallow as possible
         dynamical_decoupling=True,
         twirling=True,
     )
@@ -95,13 +95,14 @@ def test_hardware_3x3_pipeline():
     print(f"  {'IBM bitstring':<14}  {'Row-major grid':<14}  {'Count':>6}  {'Prob':>7}")
     for bs, cnt in top3:
         grid = bs[::-1]
-        print(f"  {bs:<14}  {grid:<14}  {cnt:>6}  {cnt/total:>6.2%}")
+        print(f"  {bs:<14}  {grid:<14}  {cnt:>6}  {cnt / total:>6.2%}")
 
     # ── Pipeline assertions ──────────────────────────────────────────────
     # The job ran, returned counts, and the bitstrings are the right length.
     assert total > 0, "No shots returned — job may have failed silently"
-    assert all(len(bs) == 9 for bs in counts), \
+    assert all(len(bs) == 9 for bs in counts), (
         f"Unexpected bitstring length: {[len(b) for b in list(counts)[:3]]}"
+    )
     assert unique > 0, "Empty counts dict returned"
 
     print(f"\n✓  Pipeline complete — {total} shots returned from {backend_name}")
