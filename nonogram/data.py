@@ -10,7 +10,7 @@ for each row and column constraint.
   - Key: ``"length/clue_1;clue_2;...;"`` (e.g., ``"4/1;2;"`` for a 4-cell line with clues 1 and 2)
   - Value: List of valid bitstring configurations as integers (bit index 0 = leftmost cell)
 
-**Coverage:** Line lengths 1–6 (supports up to 6×6 nonogram puzzles)
+**Coverage:** Line lengths 1–10 (supports up to 10×10 nonogram puzzles)
 
 **Example:**
 
@@ -22,74 +22,170 @@ The lookup table is precomputed at module load time for O(1) constraint lookup
 during SAT formula generation, avoiding expensive runtime pattern generation.
 """
 
-possible_d: dict[str, list[int]] = {
-    # l = 1
-    "1/0;": [0b0],
-    "1/1;": [0b1],
-    # l = 2
-    "2/0;": [0b00],
-    "2/1;": [0b01, 0b10],
-    "2/2;": [0b11],
-    # l = 3
-    "3/0;": [0b000],
-    "3/1;": [0b100, 0b010, 0b001],
-    "3/2;": [0b110, 0b011],
-    "3/3;": [0b111],
-    "3/1;1;": [0b101],
-    # l = 4
-    "4/0;": [0b0000],
-    "4/1;": [0b1000, 0b0100, 0b0010, 0b0001],
-    "4/2;": [0b1100, 0b0110, 0b0011],
-    "4/3;": [0b1110, 0b0111],
-    "4/4;": [0b1111],
-    "4/1;1;": [0b1010, 0b0101, 0b1001],
-    "4/2;1;": [0b1101],
-    "4/1;2;": [0b1011],
-    # l = 5
-    "5/0;": [0b00000],
-    "5/1;": [0b10000, 0b01000, 0b00100, 0b00010, 0b00001],
-    "5/2;": [0b11000, 0b01100, 0b00110, 0b00011],
-    "5/3;": [0b11100, 0b01110, 0b00111],
-    "5/4;": [0b11110, 0b01111],
-    "5/5;": [0b11111],
-    "5/1;1;": [0b10100, 0b10010, 0b10001, 0b01010, 0b01001, 0b00101],
-    "5/1;2;": [0b10011, 0b10110, 0b01011],
-    "5/1;3;": [0b10111],
-    "5/2;1;": [0b11001, 0b11010, 0b01101],
-    "5/2;2;": [0b11011],
-    "5/3;1;": [0b11101],
-    "5/1;1;1;": [0b10101],
-    # l = 6
-    "6/0;": [0b000000],
-    "6/1;": [0b100000, 0b010000, 0b001000, 0b000100, 0b000010, 0b000001],
-    "6/2;": [0b110000, 0b011000, 0b001100, 0b000110, 0b000011],
-    "6/3;": [0b111000, 0b011100, 0b001110, 0b000111],
-    "6/4;": [0b111100, 0b011110, 0b001111],
-    "6/5;": [0b111110, 0b011111],
-    "6/6;": [0b111111],
-    "6/1;1;": [
-        0b101000,
-        0b100100,
-        0b100010,
-        0b100001,
-        0b010100,
-        0b010010,
-        0b010001,
-        0b001010,
-        0b001001,
-        0b000101,
-    ],
-    "6/1;2;": [0b101100, 0b100110, 0b100011, 0b010110, 0b010011, 0b001011],
-    "6/1;3;": [0b101110, 0b100111, 0b010111],
-    "6/1;4;": [0b101111],
-    "6/2;1;": [0b110100, 0b110010, 0b110001, 0b011010, 0b011001, 0b001101],
-    "6/2;2;": [0b110110, 0b110011, 0b011011],
-    "6/2;3;": [0b110111],
-    "6/3;1;": [0b111010, 0b111001, 0b011101],
-    "6/3;2;": [0b111011],
-    "6/4;1;": [0b111101],
-    "6/1;1;1;": [0b101010, 0b101001, 0b100101, 0b010101],
-    "6/1;1;2;": [0b101011],
-    "6/1;2;1;": [0b101101],
-    "6/2;1;1;": [0b110101],
-}
+from nonogram.errors import ValidationError
+
+
+def _generate_patterns(line_len: int, clue: tuple[int, ...]) -> list[int]:
+    """Generate all valid bitstring patterns for a line of given length and clue.
+
+    Uses recursive placement: for each block in the clue, try all valid starting
+    positions, then recurse for the remaining blocks in the remaining space.
+
+    Parameters
+    ----------
+    line_len : int
+        Number of cells in the line.
+    clue : tuple[int, ...]
+        Block lengths for this line. (0,) means all empty.
+
+    Returns
+    -------
+    list[int]
+        Valid bitstring patterns as integers (bit index 0 = leftmost cell).
+    """
+    if clue == (0,) or not clue:
+        return [0]
+
+    results: list[int] = []
+
+    def _place(block_idx: int, start: int, pattern: int) -> None:
+        if block_idx == len(clue):
+            results.append(pattern)
+            return
+
+        block_len = clue[block_idx]
+        remaining_blocks = clue[block_idx + 1 :]
+        min_remaining = sum(remaining_blocks) + len(remaining_blocks)
+
+        for pos in range(start, line_len - block_len - min_remaining + 1):
+            bits = 0
+            for b in range(block_len):
+                bits |= 1 << pos + b
+            _place(block_idx + 1, pos + block_len + 1, pattern | bits)
+
+    _place(0, 0, 0)
+    return results
+
+
+def _generate_all_clues(line_len: int) -> list[tuple[int, ...]]:
+    """Generate all valid clue combinations for a line of given length.
+
+    A valid clue for a line of length L is any sequence of positive integers
+    (b1, b2, ..., bk) such that sum(bi) + (k-1) <= L, plus the empty clue (0,).
+    """
+    clues: list[tuple[int, ...]] = [(0,)]
+
+    def _recurse(remaining: int, current: list[int]) -> None:
+        if current:
+            clues.append(tuple(current))
+        for block in range(1, remaining + 1):
+            current.append(block)
+            new_remaining = remaining - block - 1
+            if new_remaining >= 0:
+                _recurse(new_remaining, current)
+            elif new_remaining == -1:
+                clues.append(tuple(current))
+            current.pop()
+
+    _recurse(line_len, [])
+    return clues
+
+
+def _build_lookup_table(max_line_len: int = 10) -> dict[str, list[int]]:
+    """Build the complete lookup table for line lengths 1 through max_line_len."""
+    table: dict[str, list[int]] = {}
+    for length in range(1, max_line_len + 1):
+        for clue in _generate_all_clues(length):
+            key = f"{length}/{';'.join(map(str, clue))};"
+            patterns = _generate_patterns(length, clue)
+            if patterns:
+                table[key] = patterns
+    return table
+
+
+def valid_line_configs(line_len: int, clue: tuple[int, ...]) -> int:
+    """Return the number of valid configurations for a single line constraint.
+
+    Parameters
+    ----------
+    line_len : int
+        Number of cells in the line.
+    clue : tuple[int, ...]
+        Block lengths for this line.
+
+    Returns
+    -------
+    int
+        Number of valid bitstring patterns that satisfy the clue.
+
+    Raises
+    ------
+    ValidationError
+        If the clue is not compatible with the line length.
+    """
+    key = f"{line_len}/{';'.join(map(str, clue))};"
+    if key in possible_d:
+        return len(possible_d[key])
+    min_cells = sum(clue) + len(clue) - 1 if clue != (0,) else 0
+    if min_cells > line_len:
+        raise ValidationError(
+            f"Clue {list(clue)} requires at least {min_cells} cells "
+            f"but the line is only {line_len} long."
+        )
+    patterns = _generate_patterns(line_len, clue)
+    return len(patterns)
+
+
+def constraint_density(
+    row_clues: list[tuple[int, ...]],
+    col_clues: list[tuple[int, ...]],
+) -> dict:
+    """Compute constraint density metrics from a puzzle's clue structure.
+
+    For each row and column clue, computes the number of valid line
+    configurations. Aggregates into overall constraint density metrics that
+    characterize puzzle difficulty.
+
+    Parameters
+    ----------
+    row_clues : list[tuple[int, ...]]
+        List of row clues.
+    col_clues : list[tuple[int, ...]]
+        List of column clues.
+
+    Returns
+    -------
+    dict
+        Constraint density metrics:
+        - row_configs: list of valid config counts per row
+        - col_configs: list of valid config counts per column
+        - total_configs: sum of all valid configs
+        - mean_configs: average valid configs per line
+        - min_configs: minimum valid configs across all lines
+        - max_configs: maximum valid configs across all lines
+        - search_space: 2^(rows*cols) total possible configurations
+        - density_ratio: total_configs / (num_lines * search_space_per_line)
+    """
+    n = len(row_clues)
+    d = len(col_clues)
+
+    row_configs = [valid_line_configs(d, clue) for clue in row_clues]
+    col_configs = [valid_line_configs(n, clue) for clue in col_clues]
+
+    all_configs = row_configs + col_configs
+    total = sum(all_configs)
+    num_lines = n + d
+
+    return {
+        "row_configs": row_configs,
+        "col_configs": col_configs,
+        "total_configs": total,
+        "mean_configs": total / num_lines if num_lines else 0,
+        "min_configs": min(all_configs) if all_configs else 0,
+        "max_configs": max(all_configs) if all_configs else 0,
+        "search_space": 2 ** (n * d),
+        "density_ratio": total / (num_lines * (2 ** max(n, d))) if num_lines else 0,
+    }
+
+
+possible_d: dict[str, list[int]] = _build_lookup_table(10)
