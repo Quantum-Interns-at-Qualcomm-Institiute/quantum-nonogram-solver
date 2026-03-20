@@ -12,13 +12,13 @@ KEY_PATTERN = re.compile(r"^(\d+)/((?:\d+;)+)$")
 
 
 def _bitstring_to_bits(bitstring: int, length: int) -> list[bool]:
-    """Convert an integer bitstring to a list of bools, MSB = leftmost cell.
+    """Convert an integer bitstring to a list of bools, LSB = leftmost cell.
 
-    The data table uses the convention that the highest bit position
-    (length-1) corresponds to the leftmost cell.  So we read bits from
-    the MSB down to bit 0 to get left-to-right order.
+    The data table uses the convention that bit position 0 (LSB)
+    corresponds to the leftmost cell, matching core.py's encoding
+    where ``1 << pos`` and pos=0 is the first cell in a line.
     """
-    return [bool(bitstring & (1 << (length - 1 - i))) for i in range(length)]
+    return [bool(bitstring & (1 << i)) for i in range(length)]
 
 
 def _rle_from_int(bitstring: int, length: int) -> tuple[int, ...]:
