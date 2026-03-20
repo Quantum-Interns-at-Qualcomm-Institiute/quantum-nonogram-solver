@@ -1,3 +1,7 @@
+# Hidden files
+.*
+!.git*
+
 # Python
 __pycache__/
 *.py[cod]
@@ -5,35 +9,17 @@ __pycache__/
 dist/
 build/
 *.egg
-.eggs/
 
 # Virtual environments
 venv/
-.venv/
 env/
-.conda/
-
-# Jupyter
-.ipynb_checkpoints/
 
 # Testing
-.pytest_cache/
 htmlcov/
-.coverage
 
 # IDE
-.vscode/
-.idea/
 *.swp
 *.swo
 
 # OS
-.DS_Store
 Thumbs.db
-
-# Environment
-.env
-
-# Dev certs
-.certs/
-.claude/
