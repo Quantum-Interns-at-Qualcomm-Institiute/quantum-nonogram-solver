@@ -49,7 +49,7 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT))
 
-from flask import Flask, render_template
+from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
@@ -58,7 +58,7 @@ from tools.config import MAX_CLUES, MAX_GRID
 from tools.routes import ALL_BLUEPRINTS
 
 # ── Flask setup ──────────────────────────────────────────────────────────────
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(__name__)
 app.config["SECRET_KEY"] = "nonogram-dev-key"
 CORS(app)
 socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
@@ -71,13 +71,13 @@ for bp in ALL_BLUEPRINTS:
     app.register_blueprint(bp)
 
 
-# ── Index route ──────────────────────────────────────────────────────────────
+# ── Config API (frontend lives in the website repo) ──────────────────────────
 
-@app.route("/")
-def index():
-    """Serve the main HTML interface."""
-    return render_template("index.html",
-                           MAX_CLUES=MAX_CLUES, MAX_GRID=MAX_GRID)
+@app.route("/api/config")
+def api_config():
+    """Return solver configuration for the static frontend."""
+    from flask import jsonify
+    return jsonify({"max_clues": MAX_CLUES, "max_grid": MAX_GRID})
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
