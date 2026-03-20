@@ -51,7 +51,7 @@ Usage
     data = load_puzzle("my_puzzle.non.json")
 """
 
-from nonogram.classical import classical_solve
+from nonogram.classical import ExecutionCounts, classical_solve
 from nonogram.core import (
     display_nonogram,
     grid_to_clues,
@@ -70,11 +70,14 @@ from nonogram.errors import (
     SolverError,
     ValidationError,
 )
+from nonogram.data import constraint_density, valid_line_configs
 from nonogram.io import load_batch, load_puzzle, save_batch, save_puzzle
 from nonogram.metrics import (
     ClassicalMetrics,
     ComparisonReport,
     QuantumMetrics,
+    StaticCircuitAnalysis,
+    analyze_circuit,
     benchmark,
     print_report,
 )
@@ -95,12 +98,15 @@ __all__ = [
     "grid_to_clues",
     "parse_clue",
     "classical_solve",
+    "ExecutionCounts",
     "quantum_solve",
     "benchmark",
     "print_report",
     "ClassicalMetrics",
     "QuantumMetrics",
     "ComparisonReport",
+    "StaticCircuitAnalysis",
+    "analyze_circuit",
     "save_puzzle",
     "load_puzzle",
     "save_batch",
@@ -116,4 +122,6 @@ __all__ = [
     "QuantumSolverError",
     "HardwareError",
     "PuzzleIOError",
+    "valid_line_configs",
+    "constraint_density",
 ]
