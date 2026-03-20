@@ -8,7 +8,7 @@ Institute, UC San Diego. We welcome issues and pull requests.
 ```bash
 git clone https://github.com/Quantum-Interns-at-Qualcomm-Institiute/quantum-nonogram-solver.git
 cd quantum-nonogram-solver
-pip install -e ".[quantum,web,dev]"
+pip install -e "."
 ```
 
 ## Before submitting a PR

@@ -431,7 +431,7 @@ pytest tests/test_hardware_2x2.py -v -s       # hardware test (needs .env)
 Install everything:
 
 ```bash
-pip install -e ".[quantum,web,dev]"
+pip install -e "."
 ```
 
 ---
