@@ -81,7 +81,8 @@ class TestBenchmarkIntegration:
     """Test the benchmark function produces valid reports."""
 
     def test_benchmark_both_solvers(self):
-        puzzle = ([(1,)], [(1,)])
+        # Use 2x2 unique-solution puzzle (1x1 is degenerate for Grover)
+        puzzle = ([(2,), (2,)], [(2,), (2,)])
         report = benchmark(puzzle, run_classical=True, run_quantum=True)
         assert report.classical is not None
         assert report.quantum is not None
@@ -90,13 +91,13 @@ class TestBenchmarkIntegration:
         assert report.actual_speedup > 0
 
     def test_benchmark_classical_only(self):
-        puzzle = ([(1,)], [(1,)])
+        puzzle = ([(2,), (2,)], [(2,), (2,)])
         report = benchmark(puzzle, run_classical=True, run_quantum=False)
         assert report.classical is not None
         assert report.quantum is None
 
     def test_benchmark_quantum_only(self):
-        puzzle = ([(1,)], [(1,)])
+        puzzle = ([(2,), (2,)], [(2,), (2,)])
         report = benchmark(puzzle, run_classical=False, run_quantum=True)
         assert report.classical is None
         assert report.quantum is not None
