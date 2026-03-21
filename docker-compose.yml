@@ -5,6 +5,4 @@ services:
       - "127.0.0.1:${PORT:-5055}:${PORT:-5055}"
     environment:
       PORT: ${PORT:-5055}
-      DEV_CERT_DIR: /app/.certs
-    volumes:
-      - ./.certs:/app/.certs:ro
+      DEV_CERT_DIR: ""
