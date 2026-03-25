@@ -60,7 +60,8 @@ function applyHwStatus({ connected, backend_name }) {
 function updateBenchBtn() {
   const t = Math.max(1, parseInt($("trials-input").value, 10) || 1);
   const hw = state.hwConnected ? state.hwBackend : "Simulator";
-  elBtnBench.innerHTML = `${PLAY_SVG} Run on ${hw}`;
+  elBtnBench.innerHTML = PLAY_SVG;
+  elBtnBench.append(` Run on ${hw}`);
 }
 
 // ── Theme cycling ───────────────────────────────────────────────

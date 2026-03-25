@@ -1,9 +1,7 @@
 """Tests for classical solver execution count instrumentation."""
 
-import pytest
 
 from nonogram.classical import ExecutionCounts, classical_solve
-
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2x2
 

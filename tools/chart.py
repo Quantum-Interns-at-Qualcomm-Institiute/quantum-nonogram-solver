@@ -19,19 +19,34 @@ def report_to_dict(report: Any) -> dict:
     """Convert a ComparisonReport to a JSON-serializable dictionary."""
     cl = report.classical
     qu = report.quantum
-    return {
+    sc = report.static_circuit
+    ss = report.solution_space
+    hw = report.hardware_requirements
+    cd = report.constraint_density_metrics
+
+    d: dict = {
         "num_variables": report.num_variables,
         "search_space_size": report.search_space_size,
         "boolean_expression_length": report.boolean_expression_length,
         "theoretical_grover_speedup": report.theoretical_grover_speedup,
         "actual_speedup": report.actual_speedup,
         "quantum_advantage_ratio": report.quantum_advantage_ratio,
+        "encoding_time_s": report.encoding_time_s,
+        "circuit_construction_time_s": report.circuit_construction_time_s,
+        "confidence_runs_95": report.confidence_runs_95,
+        "confidence_runs_99": report.confidence_runs_99,
         "classical": {
             "solve_time_s": cl.solve_time_s,
             "configurations_evaluated": cl.configurations_evaluated,
             "solutions_found": cl.solutions_found,
             "peak_memory_kb": cl.peak_memory_kb,
             "configs_per_second": cl.configs_per_second,
+            "clause_evaluations": cl.clause_evaluations,
+            "subclause_evaluations": cl.subclause_evaluations,
+            "literal_evaluations": cl.literal_evaluations,
+            "early_terminations": cl.early_terminations,
+            "early_termination_rate": cl.early_termination_rate,
+            "avg_clauses_per_candidate": cl.avg_clauses_per_candidate,
         }
         if cl
         else None,
@@ -46,10 +61,46 @@ def report_to_dict(report: Any) -> dict:
             "oracle_evaluation_correct": qu.oracle_evaluation_correct,
             "solutions_found": qu.solutions_found,
             "peak_memory_kb": qu.peak_memory_kb,
+            "background_probability": qu.background_probability,
+            "signal_to_noise": qu.signal_to_noise,
+            "distribution_entropy": qu.distribution_entropy,
         }
         if qu
         else None,
+        "static_circuit": {
+            "num_qubits": sc.num_qubits,
+            "problem_qubits": sc.problem_qubits,
+            "ancilla_qubits": sc.ancilla_qubits,
+            "ancilla_ratio": sc.ancilla_ratio,
+            "circuit_depth": sc.circuit_depth,
+            "total_gate_count": sc.total_gate_count,
+            "two_qubit_gate_count": sc.two_qubit_gate_count,
+            "two_qubit_gate_density": sc.two_qubit_gate_density,
+            "depth_per_iteration": sc.depth_per_iteration,
+            "gates_per_qubit": sc.gates_per_qubit,
+            "grover_iterations": sc.grover_iterations,
+        }
+        if sc
+        else None,
+        "constraint_density": cd,
+        "solution_space": {
+            "solutions_found": ss.solutions_found,
+            "solution_density": ss.solution_density,
+            "mean_hamming": ss.mean_hamming,
+            "min_hamming": ss.min_hamming,
+            "max_hamming": ss.max_hamming,
+        }
+        if ss
+        else None,
+        "hardware_requirements": {
+            "estimated_coherence_us": hw.estimated_coherence_us,
+            "max_gate_error_rate": hw.max_gate_error_rate,
+            "break_even_search_space": hw.break_even_search_space,
+        }
+        if hw
+        else None,
     }
+    return d
 
 
 def render_chart_b64(

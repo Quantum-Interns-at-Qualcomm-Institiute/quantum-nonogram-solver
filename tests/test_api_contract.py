@@ -79,11 +79,9 @@ class TestGridAPIContract:
         resp = client.post("/api/grid", json={"rows": 2, "cols": 3, "grid": grid})
         assert resp.status_code == 200
 
-    def test_clamps_invalid_dimensions(self, client):
+    def test_rejects_invalid_dimensions(self, client):
         resp = client.post("/api/grid", json={"rows": 100, "cols": -5})
-        assert resp.status_code == 200
-        assert app_state.state["rows"] <= MAX_GRID
-        assert app_state.state["cols"] >= 1
+        assert resp.status_code == 400
 
 
 class TestRandomizeAPIContract:

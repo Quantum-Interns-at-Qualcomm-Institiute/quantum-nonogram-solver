@@ -31,7 +31,7 @@ Flask + Socket.IO web interface for interactive nonogram solving.
 **Ports & Configuration:**
 
   - HTTP: Port 5055 (configured to avoid AirPlay/preview server conflicts)
-  - WebSocket: Socket.IO over HTTP (cors_allowed_origins="*" for dev)
+  - WebSocket: Socket.IO over HTTP (CORS restricted to localhost by default)
   - Puzzle storage: ./puzzles/ directory (auto-created)
   - Max grid size: 6x6 (limited by data.py lookup table)
   - Max clues per line: 3 blocks
@@ -60,9 +60,13 @@ from tools.routes import ALL_BLUEPRINTS  # noqa: E402
 
 # ── Flask setup ──────────────────────────────────────────────────────────────
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "nonogram-dev-key"
-CORS(app)
-socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
+app.secret_key = os.environ.get("NONOGRAM_SECRET_KEY", os.urandom(32).hex())
+CORS(app, origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*").split(","))
+socketio = SocketIO(
+    app,
+    async_mode="threading",
+    cors_allowed_origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*").split(","),
+)
 
 # Bind SocketIO to state module so helpers can emit
 app_state.init(socketio)
@@ -88,8 +92,6 @@ def api_config():
 
 def _get_ssl_context():
     """Return (cert, key) paths if dev certs exist, else None."""
-    from pathlib import Path
-
     for d in [
         Path(os.environ.get("DEV_CERT_DIR", "")),
         Path(__file__).resolve().parents[2] / ".certs",
@@ -101,12 +103,12 @@ def _get_ssl_context():
 
 
 if __name__ == "__main__":
-    PORT = 5055
+    PORT = int(os.environ.get("PORT", 5055))
     ssl_ctx = _get_ssl_context()
     scheme = "https" if ssl_ctx else "http"
     threading.Timer(1.2, lambda: webbrowser.open(f"{scheme}://localhost:{PORT}")).start()
     print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")
-    HOST = os.environ.get("NONOGRAM_HOST", "0.0.0.0")
+    HOST = os.environ.get("NONOGRAM_HOST", "127.0.0.1")
     socketio.run(
-        app, host=HOST, port=PORT, debug=False, allow_unsafe_werkzeug=True, ssl_context=ssl_ctx
+        app, host=HOST, port=PORT, debug=False, ssl_context=ssl_ctx
     )

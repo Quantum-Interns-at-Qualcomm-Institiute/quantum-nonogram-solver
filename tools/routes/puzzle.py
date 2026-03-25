@@ -51,6 +51,8 @@ def api_puzzle_load():
 def api_puzzle_save():
     """Download the current puzzle as a .non.json file."""
     data = request.json
+    if data is None:
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
     row_clues = [tuple(c) for c in data["row_clues"]]
     col_clues = [tuple(c) for c in data["col_clues"]]
     name = data.get("name", state["puzzle_name"]) or "puzzle"

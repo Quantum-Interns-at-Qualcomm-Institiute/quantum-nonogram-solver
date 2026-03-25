@@ -75,8 +75,8 @@ describe('DOM references', () => {
 describe('SVG icon constants', () => {
   test('all icons are non-empty strings', () => {
     const icons = [
-      'DICE_SVG', 'X_SVG', 'UPLOAD_SVG', 'DOWNLOAD_SVG', 'CLOUD_SVG',
-      'PLAY_SVG', 'PLUS_SVG', 'EXPORT_SVG', 'IMPORT_SVG', 'TRASH_SVG',
+      'DICE_SVG', 'X_SVG', 'UPLOAD_SVG', 'DOWNLOAD_SVG',
+      'PLAY_SVG', 'PLUS_SVG',
     ];
     for (const name of icons) {
       expect(typeof App[name]).toBe('string');
