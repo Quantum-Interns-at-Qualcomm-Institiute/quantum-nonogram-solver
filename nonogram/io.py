@@ -46,7 +46,7 @@ from nonogram.errors import PuzzleIOError, ValidationError
 
 __all__ = ["save_puzzle", "load_puzzle", "save_batch", "load_batch"]
 
-_MAX_LINE = 6  # matches existing data.py lookup table
+_MAX_LINE = 10  # matches config.py MAX_GRID and data.py lookup table
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,5 @@
 """Tests for nonogram.classical — brute-force solver on small and demo puzzles."""
 
-import pytest
 
 from nonogram.classical import classical_solve
 
@@ -68,28 +67,39 @@ class TestManualCheck:
 
 
 # ---------------------------------------------------------------------------
-# Demo puzzle (4×6) — known solution from the notebook
+# Demo puzzles — exhaustive search and known-solution validation
 # ---------------------------------------------------------------------------
 
 
 class TestDemoPuzzle:
-    PUZZLE = (
+    """Exhaustive brute-force tests use a 4×4 puzzle (2^16 candidates) that
+    completes in < 1 s.  The original 4×6 notebook puzzle (2^24 candidates) is
+    validated via the fast *manual_check* path only.
+    """
+
+    # 4×4 cross pattern — tractable for exhaustive search
+    PUZZLE_4x4 = (
+        [(2,), (4,), (4,), (2,)],
+        [(2,), (4,), (4,), (2,)],
+    )
+    EXPECTED_4x4 = "0110111111110110"
+
+    # Original 4×6 notebook puzzle — too large for brute-force in test time
+    PUZZLE_4x6 = (
         [(1, 1), (2, 2), (1, 2, 1), (1, 1)],
         [(4,), (1,), (1,), (1,), (1,), (4,)],
     )
-    EXPECTED = "100001110011101101100001"
+    EXPECTED_4x6 = "100001110011101101100001"
 
-    @pytest.mark.slow
     def test_known_solution_found(self):
-        results = classical_solve(self.PUZZLE)
-        assert self.EXPECTED in results
+        results = classical_solve(self.PUZZLE_4x4)
+        assert self.EXPECTED_4x4 in results
 
-    @pytest.mark.slow
     def test_unique_solution(self):
-        results = classical_solve(self.PUZZLE)
+        results = classical_solve(self.PUZZLE_4x4)
         assert len(results) == 1
 
     def test_manual_check_accepts_known_solution(self):
-        """Fast path: verifies one known string without exhaustive search."""
-        results = classical_solve(self.PUZZLE, manual_check=self.EXPECTED)
-        assert results == [self.EXPECTED]
+        """Fast path: verifies the 4×6 notebook solution without exhaustive search."""
+        results = classical_solve(self.PUZZLE_4x6, manual_check=self.EXPECTED_4x6)
+        assert results == [self.EXPECTED_4x6]

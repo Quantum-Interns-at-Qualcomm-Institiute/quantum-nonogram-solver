@@ -16,9 +16,20 @@ bp = Blueprint("grid", __name__)
 def api_grid():
     """Update the grid state from a client request."""
     data = request.json
-    rows = max(1, min(MAX_GRID, int(data.get("rows", state["rows"]))))
-    cols = max(1, min(MAX_GRID, int(data.get("cols", state["cols"]))))
-    grid = data.get("grid") or [[False] * cols for _ in range(rows)]
+    if data is None:
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    rows = int(data.get("rows", state.get("rows", 5)))
+    cols = int(data.get("cols", state.get("cols", 5)))
+    if not (1 <= rows <= MAX_GRID and 1 <= cols <= MAX_GRID):
+        return jsonify({"error": f"Grid dimensions must be 1-{MAX_GRID}"}), 400
+    grid = data.get("grid")
+    if grid is not None:
+        if not isinstance(grid, list) or not all(isinstance(row, list) for row in grid):
+            return jsonify({"error": "Grid must be a 2D array"}), 400
+        if len(grid) != rows or any(len(row) != cols for row in grid):
+            return jsonify({"error": f"Grid dimensions must be {rows}x{cols}"}), 400
+    else:
+        grid = [[False] * cols for _ in range(rows)]
     with state_lock:
         state["rows"] = rows
         state["cols"] = cols
@@ -30,8 +41,10 @@ def api_grid():
 def api_randomize():
     """Generate a random grid of specified dimensions."""
     data = request.json or {}
-    rows = max(1, min(MAX_GRID, int(data.get("rows", state["rows"]))))
-    cols = max(1, min(MAX_GRID, int(data.get("cols", state["cols"]))))
+    rows = int(data.get("rows", state.get("rows", 5)))
+    cols = int(data.get("cols", state.get("cols", 5)))
+    if not (1 <= rows <= MAX_GRID and 1 <= cols <= MAX_GRID):
+        return jsonify({"error": f"Grid dimensions must be 1-{MAX_GRID}"}), 400
     grid = [[random.random() > 0.5 for _ in range(cols)] for _ in range(rows)]
     with state_lock:
         state["rows"] = rows

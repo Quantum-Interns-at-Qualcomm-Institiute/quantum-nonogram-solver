@@ -4,14 +4,12 @@ Validates boolean expression generation, classical clause output, variable
 indexing, parenthesis balancing, and error handling for invalid clues.
 """
 
-import re
 from itertools import product
 
 import pytest
 
 from nonogram.core import puzzle_to_boolean
 from nonogram.errors import ValidationError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -123,11 +121,7 @@ class TestThreeByThree:
         n = len(row_clues)
         d = len(col_clues)
         expected_groups = n + d
-        # Each group except the last is followed by '&(' at the top level.
-        # Count occurrences of ')&(' which separate groups.
-        separator_count = expr.count(")&(")
-        # separator_count = expected_groups - 1 for the outermost level, but
-        # inner groups also produce ')&(' inside clauses. Instead, parse depth.
+        # Parse depth to count top-level AND groups.
         depth = 0
         top_level_ands = 0
         for ch in expr:
