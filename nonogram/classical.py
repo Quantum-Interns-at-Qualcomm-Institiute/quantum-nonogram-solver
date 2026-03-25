@@ -9,7 +9,7 @@ for larger grids due to exponential search space.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from nonogram.core import puzzle_to_boolean
 

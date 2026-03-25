@@ -31,11 +31,13 @@ def init(sio: SocketIO) -> None:
 
 def emit_status(msg: str, level: str = "info") -> None:
     """Broadcast a status message to all connected clients."""
-    socketio.emit("status", {"msg": msg, "level": level})
+    if socketio is not None:
+        socketio.emit("status", {"msg": msg, "level": level})
 
 
 def set_busy(busy: bool) -> None:
     """Update busy flag and broadcast to clients."""
     with state_lock:
         state["busy"] = busy
-    socketio.emit("busy", {"busy": busy})
+    if socketio is not None:
+        socketio.emit("busy", {"busy": busy})

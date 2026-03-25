@@ -129,14 +129,14 @@ class TestValidateClues:
             _validate_clues([("one",)], [(1,)])  # type: ignore[arg-type]
 
     def test_exceeds_max_line_raises(self):
-        # 7 rows exceeds _MAX_LINE=6
-        big = [(1,)] * 7
+        # 11 rows exceeds _MAX_LINE=10
+        big = [(1,)] * 11
         with pytest.raises(ValueError, match="maximum"):
-            _validate_clues(big, [(1,)] * 6)
+            _validate_clues(big, [(1,)] * 10)
 
     def test_exactly_max_line_ok(self):
-        # 6×6 should be accepted
-        clues = [(1,)] * 6
+        # 10×10 should be accepted
+        clues = [(1,)] * 10
         _validate_clues(clues, clues)  # should not raise
 
 
@@ -218,9 +218,9 @@ class TestSavePuzzle:
 
     def test_oversized_raises(self, tmp_path):
         dest = tmp_path / "p.non.json"
-        big = [(1,)] * 7
+        big = [(1,)] * 11
         with pytest.raises(ValueError, match="maximum"):
-            save_puzzle(big, [(1,)] * 6, dest)
+            save_puzzle(big, [(1,)] * 10, dest)
 
 
 class TestLoadPuzzle:

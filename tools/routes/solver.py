@@ -11,9 +11,20 @@ from flask import Blueprint, jsonify, request
 
 from tools.chart import render_chart_b64, report_to_dict
 from tools.config import RUNS_DIR
-from tools.state import emit_status, set_busy, state
+from tools.state import emit_status, set_busy, state, state_lock
 
 bp = Blueprint("solver", __name__)
+
+
+def _sanitize_error(exc: Exception) -> str:
+    """Strip potential credentials from error messages."""
+    import re
+
+    msg = str(exc)
+    # Remove anything that looks like an API token (long alphanumeric strings)
+    msg = re.sub(r'[a-zA-Z0-9_-]{40,}', '[REDACTED]', msg)
+    # Truncate to reasonable length
+    return msg[:500]
 
 
 def _save_run(payload: dict) -> None:
@@ -22,8 +33,9 @@ def _save_run(payload: dict) -> None:
         run_file = RUNS_DIR / f"run_{payload['run_id']}.json"
         with open(run_file, "w") as fh:
             json.dump(payload, fh, indent=2)
-    except Exception:
-        pass
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Failed to save run: %s", exc)
 
 
 def _build_payload(
@@ -72,7 +84,8 @@ def _parse_clues(data: dict) -> tuple[list, list, int, int]:
 
 def _get_quantum_solver():
     """Build the appropriate quantum Solver from hw_config state."""
-    hw_cfg = state["hw_config"]
+    with state_lock:
+        hw_cfg = state.get("hw_config")
     if hw_cfg:
         from nonogram.solver import QuantumHardwareSolver
 
@@ -90,10 +103,22 @@ def _get_quantum_solver():
 @bp.route("/api/solve/classical", methods=["POST"])
 def api_solve_classical():
     """Trigger a classical (brute-force) solve in a background thread."""
-    if state["busy"]:
-        return jsonify({"error": "Solver busy"}), 409
-    row_clues, col_clues, rows, cols = _parse_clues(request.json)
-    set_busy(True)
+    with state_lock:
+        if state["busy"]:
+            return jsonify({"error": "Solver busy"}), 409
+        state["busy"] = True
+    data = request.json
+    if data is None:
+        set_busy(False)
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    row_clues, col_clues, rows, cols = _parse_clues(data)
+
+    from nonogram.io import _validate_clues
+    try:
+        _validate_clues(row_clues, col_clues)
+    except Exception as e:
+        set_busy(False)
+        return jsonify({"error": str(e)}), 400
 
     from nonogram.solver import ClassicalSolver
 
@@ -111,8 +136,8 @@ def api_solve_classical():
         except Exception as exc:
             from tools.state import socketio
 
-            socketio.emit("solver_error", {"message": str(exc)})
-            emit_status(f"{solver.name} error: {exc}", "err")
+            socketio.emit("solver_error", {"message": _sanitize_error(exc)})
+            emit_status(f"{solver.name} error: {_sanitize_error(exc)}", "err")
         finally:
             set_busy(False)
 
@@ -123,11 +148,24 @@ def api_solve_classical():
 @bp.route("/api/solve/quantum", methods=["POST"])
 def api_solve_quantum():
     """Trigger a quantum (Grover) solve in a background thread."""
-    if state["busy"]:
-        return jsonify({"error": "Solver busy"}), 409
-    row_clues, col_clues, rows, cols = _parse_clues(request.json)
+    with state_lock:
+        if state["busy"]:
+            return jsonify({"error": "Solver busy"}), 409
+        state["busy"] = True
+    data = request.json
+    if data is None:
+        set_busy(False)
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    row_clues, col_clues, rows, cols = _parse_clues(data)
+
+    from nonogram.io import _validate_clues
+    try:
+        _validate_clues(row_clues, col_clues)
+    except Exception as e:
+        set_busy(False)
+        return jsonify({"error": str(e)}), 400
+
     solver = _get_quantum_solver()
-    set_busy(True)
     emit_status(f"{solver.name} running\u2026", "warn")
 
     def _work():
@@ -149,8 +187,8 @@ def api_solve_quantum():
         except Exception as exc:
             from tools.state import socketio
 
-            socketio.emit("solver_error", {"message": str(exc)})
-            emit_status(f"Quantum error: {exc}", "err")
+            socketio.emit("solver_error", {"message": _sanitize_error(exc)})
+            emit_status(f"Quantum error: {_sanitize_error(exc)}", "err")
         finally:
             set_busy(False)
 
@@ -161,13 +199,25 @@ def api_solve_quantum():
 @bp.route("/api/benchmark", methods=["POST"])
 def api_benchmark():
     """Run a benchmark comparing classical and quantum solvers."""
-    if state["busy"]:
-        return jsonify({"error": "Solver busy"}), 409
+    with state_lock:
+        if state["busy"]:
+            return jsonify({"error": "Solver busy"}), 409
+        state["busy"] = True
     data = request.json
+    if data is None:
+        set_busy(False)
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
     row_clues, col_clues, rows, cols = _parse_clues(data)
+
+    from nonogram.io import _validate_clues
+    try:
+        _validate_clues(row_clues, col_clues)
+    except Exception as e:
+        set_busy(False)
+        return jsonify({"error": str(e)}), 400
     trials = max(1, int(data.get("trials", 1)))
-    hw_cfg = state["hw_config"]
-    set_busy(True)
+    with state_lock:
+        hw_cfg = state.get("hw_config")
     label = f"{trials} trial{'s' if trials > 1 else ''}"
     emit_status(f"Benchmarking both solvers ({label}) \u2014 please wait\u2026", "warn")
 
@@ -224,18 +274,16 @@ def api_benchmark():
                 qu_times = [r.quantum.solve_time_s for r in reports if r.quantum]
                 report = reports[-1]
                 solutions = classical_solve((row_clues, col_clues))
-                # Collect per-trial quantum counts for histogram comparison
+                # Get raw counts for histogram from a single quantum run
+                # (timing data already collected by benchmark above)
                 from nonogram import quantum_solve
 
-                qu_counts_list: list[dict] = []
-                for _ in range(trials):
-                    try:
-                        qu_result = quantum_solve((row_clues, col_clues))
-                        qu_counts_list.append(dict(qu_result.circuit_results[0]))
-                    except Exception:
-                        qu_counts_list.append({})
-                raw_counts = qu_counts_list[-1] if qu_counts_list else {}
-                per_trial = qu_counts_list if len(qu_counts_list) > 1 else None
+                try:
+                    qu_result = quantum_solve((row_clues, col_clues))
+                    raw_counts = dict(qu_result.circuit_results[0])
+                except Exception:
+                    raw_counts = {}
+                per_trial = None
                 chart_b64 = render_chart_b64(report, cl_times, qu_times)
                 payload = _build_payload(
                     report,
@@ -257,8 +305,8 @@ def api_benchmark():
         except Exception as exc:
             from tools.state import socketio
 
-            socketio.emit("solver_error", {"message": str(exc)})
-            emit_status(f"Benchmark error: {exc}", "err")
+            socketio.emit("solver_error", {"message": _sanitize_error(exc)})
+            emit_status(f"Benchmark error: {_sanitize_error(exc)}", "err")
         finally:
             set_busy(False)
 

@@ -19,6 +19,7 @@ import math
 import time
 import tracemalloc
 from dataclasses import dataclass, field
+from itertools import combinations
 
 from nonogram.core import puzzle_to_boolean
 
@@ -61,11 +62,27 @@ class ClassicalMetrics:
     configs_per_second: float = field(init=False)
     """Throughput: configurations evaluated per second."""
 
+    early_termination_rate: float = field(init=False)
+    """Fraction of candidates rejected early (0–1)."""
+
+    avg_clauses_per_candidate: float = field(init=False)
+    """Average clause evaluations per candidate (lower = more pruning)."""
+
     def __post_init__(self) -> None:
         self.configs_per_second = (
             self.configurations_evaluated / self.solve_time_s
             if self.solve_time_s > 0
             else float("inf")
+        )
+        self.early_termination_rate = (
+            self.early_terminations / self.configurations_evaluated
+            if self.configurations_evaluated > 0
+            else 0.0
+        )
+        self.avg_clauses_per_candidate = (
+            self.clause_evaluations / self.configurations_evaluated
+            if self.configurations_evaluated > 0
+            else 0.0
         )
 
 
@@ -106,6 +123,15 @@ class QuantumMetrics:
     peak_memory_kb: float
     """Peak heap allocation during the solve (kilobytes)."""
 
+    background_probability: float = 0.0
+    """Uniform random probability = 1/2^n (baseline for comparison)."""
+
+    signal_to_noise: float = 0.0
+    """Ratio of top result probability to background probability."""
+
+    distribution_entropy: float = 0.0
+    """Shannon entropy of the measurement distribution (bits)."""
+
 
 @dataclass
 class StaticCircuitAnalysis:
@@ -135,6 +161,9 @@ class StaticCircuitAnalysis:
     grover_iterations: int
     """Number of Grover operator applications."""
 
+    problem_qubits: int = 0
+    """Number of qubits encoding the problem variables (n×d)."""
+
     two_qubit_gate_density: float = field(init=False)
     """Fraction of gates that are 2+-qubit entangling gates (0–1)."""
 
@@ -143,6 +172,12 @@ class StaticCircuitAnalysis:
 
     gates_per_qubit: float = field(init=False)
     """Average gates per qubit."""
+
+    ancilla_qubits: int = field(init=False)
+    """Number of ancilla qubits (total − problem)."""
+
+    ancilla_ratio: float = field(init=False)
+    """Fraction of qubits used as ancilla (0–1)."""
 
     def __post_init__(self) -> None:
         self.two_qubit_gate_density = (
@@ -159,6 +194,76 @@ class StaticCircuitAnalysis:
             self.total_gate_count / self.num_qubits
             if self.num_qubits > 0
             else 0.0
+        )
+        self.ancilla_qubits = max(0, self.num_qubits - self.problem_qubits)
+        self.ancilla_ratio = (
+            self.ancilla_qubits / self.num_qubits
+            if self.num_qubits > 0
+            else 0.0
+        )
+
+
+@dataclass
+class SolutionSpaceMetrics:
+    """Characterizes the structure and distribution of solutions in the search space."""
+
+    solutions_found: int
+    """Total number of valid solutions."""
+
+    search_space_size: int
+    """Total search space (2^n)."""
+
+    solution_density: float = field(init=False)
+    """Fraction of search space that is a valid solution."""
+
+    hamming_distances: list[int] = field(default_factory=list)
+    """Pairwise Hamming distances between all solution pairs."""
+
+    mean_hamming: float = 0.0
+    """Mean inter-solution Hamming distance."""
+
+    min_hamming: int = 0
+    """Minimum inter-solution Hamming distance."""
+
+    max_hamming: int = 0
+    """Maximum inter-solution Hamming distance."""
+
+    def __post_init__(self) -> None:
+        self.solution_density = (
+            self.solutions_found / self.search_space_size
+            if self.search_space_size > 0
+            else 0.0
+        )
+        if self.hamming_distances:
+            self.mean_hamming = sum(self.hamming_distances) / len(self.hamming_distances)
+            self.min_hamming = min(self.hamming_distances)
+            self.max_hamming = max(self.hamming_distances)
+
+
+@dataclass
+class HardwareRequirements:
+    """Estimated hardware requirements for running the circuit on real quantum hardware."""
+
+    circuit_depth: int
+    """Circuit depth (gate layers)."""
+
+    total_gate_count: int
+    """Total gates in the circuit."""
+
+    estimated_coherence_us: float = field(init=False)
+    """Estimated minimum coherence time needed (microseconds), assuming ~50ns/gate."""
+
+    max_gate_error_rate: float = field(init=False)
+    """Rough upper bound on tolerable per-gate error rate (1/total_gates)."""
+
+    break_even_search_space: int = 0
+    """Search space size where quantum oracle calls < classical constraint checks."""
+
+    def __post_init__(self) -> None:
+        gate_time_ns = 50  # typical single-gate time on superconducting hardware
+        self.estimated_coherence_us = self.circuit_depth * gate_time_ns / 1000
+        self.max_gate_error_rate = (
+            1.0 / self.total_gate_count if self.total_gate_count > 0 else 1.0
         )
 
 
@@ -187,6 +292,22 @@ class ComparisonReport:
 
     # --- constraint density (None if not computed) ---
     constraint_density_metrics: dict | None = None
+
+    # --- new metric categories ---
+    solution_space: SolutionSpaceMetrics | None = None
+    hardware_requirements: HardwareRequirements | None = None
+
+    encoding_time_s: float = 0.0
+    """Wall-clock seconds to convert puzzle to boolean expression (SAT encoding overhead)."""
+
+    circuit_construction_time_s: float = 0.0
+    """Wall-clock seconds to construct the quantum circuit (before simulation)."""
+
+    confidence_runs_95: float = 0.0
+    """Estimated runs needed for 95% probability of finding all solutions."""
+
+    confidence_runs_99: float = 0.0
+    """Estimated runs needed for 99% probability of finding all solutions."""
 
     # --- derived comparison metrics ---
     theoretical_grover_speedup: float = field(init=False, default=0.0)
@@ -251,6 +372,7 @@ def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
     ops = circuit.count_ops()
     two_qubit = circuit.num_nonlocal_gates()
 
+    num_problem = len(puzzle[0]) * len(puzzle[1])
     return StaticCircuitAnalysis(
         num_qubits=circuit.num_qubits,
         circuit_depth=circuit.depth(),
@@ -258,7 +380,88 @@ def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
         two_qubit_gate_count=two_qubit,
         gate_counts_by_type=dict(ops),
         grover_iterations=iterations_used,
+        problem_qubits=num_problem,
     )
+
+
+# ---------------------------------------------------------------------------
+# New metric helpers
+# ---------------------------------------------------------------------------
+
+
+def _hamming_distance(a: str, b: str) -> int:
+    """Count differing bits between two equal-length bitstrings."""
+    return sum(x != y for x, y in zip(a, b))
+
+
+def compute_solution_space_metrics(
+    solutions: list[str], num_variables: int
+) -> SolutionSpaceMetrics:
+    """Compute solution space structure from a list of solution bitstrings."""
+    search_space = 2**num_variables
+    distances = [
+        _hamming_distance(a, b) for a, b in combinations(solutions, 2)
+    ] if len(solutions) >= 2 else []
+
+    return SolutionSpaceMetrics(
+        solutions_found=len(solutions),
+        search_space_size=search_space,
+        hamming_distances=distances,
+    )
+
+
+def estimate_hardware_requirements(
+    static: StaticCircuitAnalysis,
+    classical_constraint_checks: int = 0,
+) -> HardwareRequirements:
+    """Estimate hardware requirements from static circuit analysis."""
+    # Break-even: find N where sqrt(N) iterations < classical constraint checks
+    break_even = 0
+    if classical_constraint_checks > 0 and static.grover_iterations > 0:
+        # Grover oracle calls scale as sqrt(N); classical as N
+        # Break-even when sqrt(N) = classical_checks → N = classical_checks^2
+        break_even = classical_constraint_checks ** 2
+
+    return HardwareRequirements(
+        circuit_depth=static.circuit_depth,
+        total_gate_count=static.total_gate_count,
+        break_even_search_space=break_even,
+    )
+
+
+def compute_confidence_runs(
+    num_solutions: int, top_probability: float
+) -> tuple[float, float]:
+    """Estimate runs needed for 95% and 99% confidence of finding all solutions.
+
+    Uses the coupon collector approximation: E[runs] ≈ n × H_n / p
+    where n = number of solutions, H_n = nth harmonic number, p = success probability.
+    """
+    if num_solutions <= 0 or top_probability <= 0:
+        return 0.0, 0.0
+
+    # Harmonic number H_n
+    h_n = sum(1.0 / k for k in range(1, num_solutions + 1))
+    expected = num_solutions * h_n / top_probability
+
+    # For P(all found) ≥ 1-δ, multiply expected by ln(1/δ) factor
+    runs_95 = expected * math.log(1 / 0.05) if num_solutions > 1 else math.log(1 / 0.05) / top_probability
+    runs_99 = expected * math.log(1 / 0.01) if num_solutions > 1 else math.log(1 / 0.01) / top_probability
+
+    return runs_95, runs_99
+
+
+def _distribution_entropy(counts: dict[str, int | float]) -> float:
+    """Compute Shannon entropy (in bits) of a probability distribution."""
+    total = sum(counts.values())
+    if total <= 0:
+        return 0.0
+    entropy = 0.0
+    for v in counts.values():
+        p = v / total
+        if p > 0:
+            entropy -= p * math.log2(p)
+    return entropy
 
 
 # ---------------------------------------------------------------------------
@@ -270,8 +473,8 @@ def benchmark(
     puzzle: tuple[list, list],
     run_classical: bool = True,
     run_quantum: bool = True,
-    static_analysis: bool = False,
-    compute_constraint_density: bool = False,
+    static_analysis: bool = True,
+    compute_constraint_density: bool = True,
 ) -> ComparisonReport:
     """Run one or both solvers on *puzzle* and collect comparison metrics.
 
@@ -300,14 +503,22 @@ def benchmark(
     num_vars = n * d
     search_space = 2**num_vars
 
-    # Build the boolean expression once (shared cost)
+    # Build the boolean expression once — measure encoding time separately
+    t_enc = time.perf_counter()
     expression = puzzle_to_boolean(row_clues, col_clues, classical=False)
+    encoding_time = time.perf_counter() - t_enc
     expr_len = len(expression)
 
     classical_metrics: ClassicalMetrics | None = None
     quantum_metrics: QuantumMetrics | None = None
     static_circuit: StaticCircuitAnalysis | None = None
     density_metrics: dict | None = None
+    solution_space: SolutionSpaceMetrics | None = None
+    hw_reqs: HardwareRequirements | None = None
+    circuit_construction_time = 0.0
+    conf_95 = 0.0
+    conf_99 = 0.0
+    classical_solutions_bs: list[str] = []
 
     # --- Classical ---
     if run_classical:
@@ -319,6 +530,8 @@ def benchmark(
         elapsed = time.perf_counter() - t0
         _, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
+
+        classical_solutions_bs = solutions  # list of bitstrings
 
         classical_metrics = ClassicalMetrics(
             solve_time_s=elapsed,
@@ -338,16 +551,18 @@ def benchmark(
         from qiskit.primitives import StatevectorSampler
         from qiskit_algorithms import AmplificationProblem, Grover
 
+        # Measure circuit construction time separately
+        t_circ = time.perf_counter()
         oracle = PhaseOracleGate(expression)
-        # AmplificationProblem auto-infers is_good_state from oracle.boolean_expression
         problem = AmplificationProblem(oracle)
         grover = Grover(sampler=StatevectorSampler())
 
-        # Extract circuit metrics before running (no sampling cost)
         iterations_used = Grover.optimal_num_iterations(
             num_solutions=1, num_qubits=oracle.num_qubits
         )
         circuit = grover.construct_circuit(problem, power=iterations_used, measurement=False)
+        circuit_construction_time = time.perf_counter() - t_circ
+
         ops = circuit.count_ops()
         two_qubit = circuit.num_nonlocal_gates()
 
@@ -359,14 +574,17 @@ def benchmark(
         tracemalloc.stop()
 
         top_counts = result.circuit_results[0]
-        top_prob = max(top_counts.values()) / sum(top_counts.values())
+        total_counts = sum(top_counts.values())
+        top_prob = max(top_counts.values()) / total_counts if total_counts else 0
         top_bitstring = max(top_counts, key=top_counts.__getitem__)
         bool_expr = oracle.boolean_expression
-        # Qiskit bitstrings are little-endian (rightmost bit = qubit 0).
-        # BooleanExpression.simulate() expects variable order x0, x1, ...
-        # so we reverse each bitstring before evaluating.
         oracle_correct = bool_expr.simulate(top_bitstring[::-1])
         valid_solutions = sum(1 for bs in top_counts if bool_expr.simulate(bs[::-1]))
+
+        # Probability distribution statistics
+        background_prob = 1.0 / search_space if search_space > 0 else 0
+        snr = top_prob / background_prob if background_prob > 0 else 0
+        entropy = _distribution_entropy(top_counts)
 
         quantum_metrics = QuantumMetrics(
             solve_time_s=elapsed,
@@ -380,7 +598,14 @@ def benchmark(
             oracle_evaluation_correct=oracle_correct,
             solutions_found=valid_solutions,
             peak_memory_kb=peak / 1024,
+            background_probability=background_prob,
+            signal_to_noise=snr,
+            distribution_entropy=entropy,
         )
+
+        # Confidence runs estimation
+        if valid_solutions > 0 and top_prob > 0:
+            conf_95, conf_99 = compute_confidence_runs(valid_solutions, top_prob)
 
     # --- Static circuit analysis ---
     if static_analysis:
@@ -392,6 +617,15 @@ def benchmark(
 
         density_metrics = constraint_density(row_clues, col_clues)
 
+    # --- Solution space metrics ---
+    if classical_solutions_bs:
+        solution_space = compute_solution_space_metrics(classical_solutions_bs, num_vars)
+
+    # --- Hardware requirements ---
+    if static_circuit:
+        cl_checks = classical_metrics.constraint_checks if classical_metrics else 0
+        hw_reqs = estimate_hardware_requirements(static_circuit, cl_checks)
+
     return ComparisonReport(
         rows=n,
         cols=d,
@@ -402,6 +636,12 @@ def benchmark(
         quantum=quantum_metrics,
         static_circuit=static_circuit,
         constraint_density_metrics=density_metrics,
+        solution_space=solution_space,
+        hardware_requirements=hw_reqs,
+        encoding_time_s=encoding_time,
+        circuit_construction_time_s=circuit_construction_time,
+        confidence_runs_95=conf_95,
+        confidence_runs_99=conf_99,
     )
 
 

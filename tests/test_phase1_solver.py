@@ -9,8 +9,6 @@ issues with Qiskit/Python version mismatches.
 from __future__ import annotations
 
 import ast
-import math
-import os
 import re
 from pathlib import Path
 

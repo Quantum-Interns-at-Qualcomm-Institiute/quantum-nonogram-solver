@@ -1,9 +1,7 @@
 """Tests for static quantum circuit analysis."""
 
-import pytest
 
 from nonogram.metrics import StaticCircuitAnalysis, analyze_circuit
-
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2x2
 

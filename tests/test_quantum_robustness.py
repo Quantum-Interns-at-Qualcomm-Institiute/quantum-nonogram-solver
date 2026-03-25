@@ -9,10 +9,8 @@ from __future__ import annotations
 import pytest
 
 from nonogram.classical import classical_solve
-from nonogram.core import rle
 from nonogram.errors import QuantumSolverError, ValidationError
 from nonogram.quantum import quantum_solve
-
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

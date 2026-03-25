@@ -10,14 +10,12 @@ from __future__ import annotations
 import io
 import json
 import time
-from unittest.mock import MagicMock, patch
 
 import pytest
 from flask_socketio import SocketIOTestClient
 
 from tools.config import MAX_CLUES, MAX_GRID
 from tools.webapp import app, socketio
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -165,14 +163,10 @@ class TestGridRandomize:
             for cell in row:
                 assert isinstance(cell, bool)
 
-    def test_randomize_clamps_dimensions(self, http_client):
-        """Dimensions exceeding MAX_GRID should be clamped."""
+    def test_randomize_rejects_invalid_dimensions(self, http_client):
+        """Dimensions exceeding MAX_GRID should be rejected with 400."""
         rv = http_client.post("/api/randomize", json={"rows": 100, "cols": 100})
-        assert rv.status_code == 200
-
-        data = rv.get_json()
-        assert data["rows"] == MAX_GRID
-        assert data["cols"] == MAX_GRID
+        assert rv.status_code == 400
 
     def test_randomize_defaults_to_current_state(self, http_client):
         """No explicit dimensions -> use current state (default 4x4)."""
@@ -280,29 +274,17 @@ class TestConfigEndpoint:
 class TestGridClamping:
     """POST /api/grid with extreme dimensions should be clamped."""
 
-    def test_oversized_grid_is_clamped(self, http_client):
+    def test_oversized_grid_is_rejected(self, http_client):
         rv = http_client.post("/api/grid", json={"rows": 999, "cols": 999})
-        assert rv.status_code == 200
+        assert rv.status_code == 400
 
-        from tools.state import state
-        assert state["rows"] == MAX_GRID
-        assert state["cols"] == MAX_GRID
-
-    def test_zero_grid_is_clamped_to_one(self, http_client):
+    def test_zero_grid_is_rejected(self, http_client):
         rv = http_client.post("/api/grid", json={"rows": 0, "cols": 0})
-        assert rv.status_code == 200
+        assert rv.status_code == 400
 
-        from tools.state import state
-        assert state["rows"] == 1
-        assert state["cols"] == 1
-
-    def test_negative_grid_is_clamped_to_one(self, http_client):
+    def test_negative_grid_is_rejected(self, http_client):
         rv = http_client.post("/api/grid", json={"rows": -5, "cols": -10})
-        assert rv.status_code == 200
-
-        from tools.state import state
-        assert state["rows"] == 1
-        assert state["cols"] == 1
+        assert rv.status_code == 400
 
 
 # ---------------------------------------------------------------------------

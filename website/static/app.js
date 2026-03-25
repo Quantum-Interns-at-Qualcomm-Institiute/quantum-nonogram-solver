@@ -36,24 +36,25 @@ bindSocket(socket);
 document.addEventListener("navbar:connect-ready", e => {
   if (e.detail.service !== "nonogram") return;
   _navWidget = e.detail.widget;
-  // Reflect current socket state (may already be connected)
   if (socket.connected) {
     _navWidget.setStatus("connected");
   } else {
-    // Socket hasn't connected yet — listen for it now that widget exists
     socket.once("connect", () => _navWidget.setStatus("connected"));
   }
-  // Listen for click on the Connect button to reconnect socket
-  const connectEl = document.getElementById("navbar-backend-connect");
-  if (connectEl) {
-    connectEl.querySelector(".ui-connect-btn").addEventListener("click", () => {
-      const url = _navWidget.getUrl();
-      _navWidget.setStatus("connecting");
-      socket.disconnect();
-      socket = io(url);
-      bindSocket(socket);
-    });
-  }
+});
+
+document.addEventListener("navbar:connect", e => {
+  if (e.detail.service !== "nonogram") return;
+  if (_navWidget) _navWidget.setStatus("connecting");
+  socket.disconnect();
+  socket = io(e.detail.url);
+  bindSocket(socket);
+});
+
+document.addEventListener("navbar:disconnect", e => {
+  if (e.detail.service !== "nonogram") return;
+  socket.disconnect();
+  if (_navWidget) _navWidget.setStatus("disconnected");
 });
 
 // ── Init ───────────────────────────────────────────────────────
@@ -218,9 +219,13 @@ $("hw-fetch-backends").addEventListener("click", async () => {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const sel = $("hw-backend-select");
-    sel.innerHTML = data.backends.map(b =>
-      `<option value="${b.name}">${b.name} (${b.qubits} qubits, ${b.pending} pending)</option>`
-    ).join("");
+    sel.innerHTML = '';
+    data.backends.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.name;
+      opt.textContent = `${b.name} (${b.qubits} qubits, ${b.pending} pending)`;
+      sel.appendChild(opt);
+    });
     $("hw-backends-wrap").style.display = "";
   } catch (err) {
     App.setStatus("Failed to fetch backends: " + err.message, "err");

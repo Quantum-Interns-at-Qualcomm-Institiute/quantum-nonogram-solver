@@ -4,18 +4,13 @@ These tests validate the integrated benchmark pipeline including execution count
 static circuit analysis, and constraint density metrics.
 """
 
-import math
 
-import pytest
 
 from nonogram.metrics import (
-    ClassicalMetrics,
-    ComparisonReport,
     StaticCircuitAnalysis,
     benchmark,
     print_report,
 )
-
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2x2
 MEDIUM_PUZZLE = ([(1,), (1,), (0,)], [(1,), (1,), (0,)])  # 3x3
@@ -45,9 +40,9 @@ class TestBenchmarkWithStaticAnalysis:
         assert result.static_circuit is not None
         assert isinstance(result.static_circuit, StaticCircuitAnalysis)
 
-    def test_static_analysis_absent_by_default(self):
+    def test_static_analysis_present_by_default(self):
         result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.static_circuit is None
+        assert result.static_circuit is not None
 
     def test_static_analysis_has_metrics(self):
         result = benchmark(
@@ -73,9 +68,9 @@ class TestBenchmarkWithConstraintDensity:
         )
         assert result.constraint_density_metrics is not None
 
-    def test_constraint_density_absent_by_default(self):
+    def test_constraint_density_present_by_default(self):
         result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.constraint_density_metrics is None
+        assert result.constraint_density_metrics is not None
 
     def test_constraint_density_has_expected_keys(self):
         result = benchmark(

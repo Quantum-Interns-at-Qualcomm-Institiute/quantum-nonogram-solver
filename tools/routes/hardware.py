@@ -14,6 +14,8 @@ bp = Blueprint("hardware", __name__)
 def api_hw_backends():
     """List available IBM quantum backends."""
     data = request.json
+    if data is None:
+        return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
         from nonogram.quantum import list_backends
 

@@ -17,12 +17,8 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import sys
-import time
 
-from nonogram.data import constraint_density
-from nonogram.metrics import analyze_circuit, benchmark, print_report
-
+from nonogram.metrics import benchmark, print_report
 
 # Puzzles of increasing size with known solutions for benchmarking.
 BENCHMARK_PUZZLES: dict[str, tuple[list, list]] = {
@@ -156,11 +152,13 @@ def run_comparison(
         gr_iters = entry.get("quantum_static", {}).get("grover_iterations", "N/A")
         theoretical = f"sqrt({ss})"
 
+        cl_str = f"{cl_checks:>16,}" if isinstance(cl_checks, int) else f"{'N/A':>16}"
+        gr_str = f"{gr_iters:>13,}" if isinstance(gr_iters, int) else f"{'N/A':>13}"
         print(f"  {entry['name']:<8} {n_vars:>5} {ss:>14,} "
-              f"{cl_checks:>16,} {gr_iters:>13} {theoretical:>12}")
+              f"{cl_str} {gr_str} {theoretical:>12}")
 
-    print(f"\n  O(N) classical constraint checks vs O(sqrt(N)) Grover iterations")
-    print(f"  Circuit depth overhead: O(log N) per iteration\n")
+    print("\n  O(N) classical constraint checks vs O(sqrt(N)) Grover iterations")
+    print("  Circuit depth overhead: O(log N) per iteration\n")
 
     if output_json:
         with open(output_json, "w") as f:

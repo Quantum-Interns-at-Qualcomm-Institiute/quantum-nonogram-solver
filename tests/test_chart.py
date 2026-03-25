@@ -75,8 +75,16 @@ class TestReportToDict:
             "theoretical_grover_speedup",
             "actual_speedup",
             "quantum_advantage_ratio",
+            "encoding_time_s",
+            "circuit_construction_time_s",
+            "confidence_runs_95",
+            "confidence_runs_99",
             "classical",
             "quantum",
+            "static_circuit",
+            "constraint_density",
+            "solution_space",
+            "hardware_requirements",
         }
         assert set(d.keys()) == expected_keys
 

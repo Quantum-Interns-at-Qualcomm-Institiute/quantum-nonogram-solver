@@ -78,22 +78,13 @@ class TestGridRoutes:
         assert resp.status_code == 200
         assert resp.get_json()["ok"] is True
 
-    def test_grid_clamps_to_max(self, client):
+    def test_grid_rejects_oversized(self, client):
         resp = client.post("/api/grid", json={"rows": 99, "cols": 99})
-        assert resp.status_code == 200
-        from tools.config import MAX_GRID
-        from tools.state import state
+        assert resp.status_code == 400
 
-        assert state["rows"] == MAX_GRID
-        assert state["cols"] == MAX_GRID
-
-    def test_grid_clamps_to_min(self, client):
+    def test_grid_rejects_undersized(self, client):
         resp = client.post("/api/grid", json={"rows": 0, "cols": -1})
-        assert resp.status_code == 200
-        from tools.state import state
-
-        assert state["rows"] == 1
-        assert state["cols"] == 1
+        assert resp.status_code == 400
 
     def test_randomize(self, client):
         resp = client.post("/api/randomize", json={"rows": 3, "cols": 3})

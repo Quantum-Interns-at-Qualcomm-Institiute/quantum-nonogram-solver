@@ -62,7 +62,7 @@ function setupDOM() {
 function loadState() {
   // Define globals that index.html provides
   window.MAX_CLUES = 3;
-  window.MAX_GRID = 6;
+  window.MAX_GRID = 10;
   window.API_BASE = 'https://localhost:5055';
   window.App = window.App || {};
 

@@ -11,7 +11,6 @@ import pytest
 from nonogram.classical import classical_solve
 from nonogram.core import rle
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 

@@ -80,7 +80,7 @@ def validate(rows: int, cols: int, r_clues: list, c_clues: list) -> bool:
 
     Raises
     ------
-    ValueError
+    ValidationError
         If clue counts do not match dimensions.
     """
     if len(r_clues) != rows:

@@ -61,6 +61,7 @@ from nonogram.core import (
     validate,
     var_clauses,
 )
+from nonogram.data import constraint_density, valid_line_configs
 from nonogram.errors import (
     ClassicalSolverError,
     HardwareError,
@@ -70,7 +71,6 @@ from nonogram.errors import (
     SolverError,
     ValidationError,
 )
-from nonogram.data import constraint_density, valid_line_configs
 from nonogram.io import load_batch, load_puzzle, save_batch, save_puzzle
 from nonogram.metrics import (
     ClassicalMetrics,
