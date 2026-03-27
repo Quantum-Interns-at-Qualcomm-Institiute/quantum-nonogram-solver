@@ -1,0 +1,15 @@
+.git
+.gitignore
+README.md
+LICENSE
+docs/
+tests/
+.vscode/
+.idea/
+__pycache__
+*.pyc
+.env
+.pytest_cache/
+website/
+notebooks/
+.claude/

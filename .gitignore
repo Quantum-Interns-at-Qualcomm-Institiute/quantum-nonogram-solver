@@ -1,6 +1,7 @@
 # Hidden files
 .*
 !.git*
+!.dockerignore
 
 # Dependencies
 node_modules/
