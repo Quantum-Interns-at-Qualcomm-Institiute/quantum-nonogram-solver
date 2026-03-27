@@ -51,6 +51,14 @@ def app():
     yield test_app, sio
 
 
+@pytest.fixture(autouse=True)
+def reset_busy():
+    """Ensure busy flag is cleared between tests."""
+    yield
+    with app_state.state_lock:
+        app_state.state["busy"] = False
+
+
 @pytest.fixture()
 def sio_client(app):
     """Socket.IO test client."""
@@ -160,6 +168,15 @@ class TestClassicalSolveFlow:
 # ── Quantum solve flow ───────────────────────────────────────────────────────
 
 
+try:
+    import qiskit  # noqa: F401
+    from nonogram.quantum import grover_solve  # noqa: F401
+    _HAS_QUANTUM = True
+except (ImportError, Exception):
+    _HAS_QUANTUM = False
+
+
+@pytest.mark.skipif(not _HAS_QUANTUM, reason="qiskit not installed")
 class TestQuantumSolveFlow:
     def test_quantum_solve_emits_qu_done(self, http_client, sio_client):
         """Quantum solve should emit qu_done with measurement counts."""
@@ -186,18 +203,15 @@ class TestQuantumSolveFlow:
 # ── Benchmark flow ───────────────────────────────────────────────────────────
 
 
+@pytest.mark.skipif(not _HAS_QUANTUM, reason="qiskit not installed (benchmark runs quantum solver)")
 class TestBenchmarkFlow:
     def test_benchmark_emits_all_events(self, http_client, sio_client):
         """Benchmark should emit cl_done, qu_done, and bench_done."""
-        # Set up a small grid first
-        grid_payload = {
-            "rows": 2,
-            "cols": 2,
-            "grid": [[True, True], [True, True]],
+        bench_payload = {
+            "row_clues": [[2], [2]],
+            "col_clues": [[2], [2]],
+            "trials": 1,
         }
-        http_client.post("/api/grid", json=grid_payload)
-
-        bench_payload = {"trials": 1}
         resp = http_client.post("/api/benchmark", json=bench_payload)
         assert resp.status_code == 200
 
