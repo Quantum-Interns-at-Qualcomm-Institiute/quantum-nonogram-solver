@@ -16,7 +16,7 @@ Flask + Socket.IO web interface for interactive nonogram solving.
 
     python tools/webapp.py
 
-  The browser opens automatically at http://localhost:5055.
+  The browser opens automatically at the assigned port.
 
 **Architecture:**
 
@@ -30,7 +30,7 @@ Flask + Socket.IO web interface for interactive nonogram solving.
 
 **Ports & Configuration:**
 
-  - HTTP: Port 5055 (configured to avoid AirPlay/preview server conflicts)
+  - HTTP: dynamically assigned (or set via PORT env var)
   - WebSocket: Socket.IO over HTTP (CORS restricted to localhost by default)
   - Puzzle storage: ./puzzles/ directory (auto-created)
   - Max grid size: 6x6 (limited by data.py lookup table)
@@ -61,11 +61,11 @@ from tools.routes import ALL_BLUEPRINTS  # noqa: E402
 # ── Flask setup ──────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("NONOGRAM_SECRET_KEY", os.urandom(32).hex())
-CORS(app, origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*").split(","))
+CORS(app, origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*,https://andypeterson.dev").split(","))
 socketio = SocketIO(
     app,
     async_mode="threading",
-    cors_allowed_origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*").split(","),
+    cors_allowed_origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*,https://andypeterson.dev").split(","),
 )
 
 # Bind SocketIO to state module so helpers can emit
@@ -102,13 +102,21 @@ def _get_ssl_context():
     return None
 
 
+def _find_port(host="127.0.0.1"):
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, 0))
+        return s.getsockname()[1]
+
+
 if __name__ == "__main__":
-    PORT = int(os.environ.get("PORT", 5055))
+    HOST = os.environ.get("NONOGRAM_HOST", "127.0.0.1")
+    PORT = int(os.environ.get("PORT") or 0) or _find_port(HOST)
     ssl_ctx = _get_ssl_context()
     scheme = "https" if ssl_ctx else "http"
     threading.Timer(1.2, lambda: webbrowser.open(f"{scheme}://localhost:{PORT}")).start()
     print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")
-    HOST = os.environ.get("NONOGRAM_HOST", "127.0.0.1")
     socketio.run(
-        app, host=HOST, port=PORT, debug=False, ssl_context=ssl_ctx
+        app, host=HOST, port=PORT, debug=False, ssl_context=ssl_ctx,
+        allow_unsafe_werkzeug=True,
     )

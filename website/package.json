@@ -2,16 +2,10 @@
   "name": "nonogram-frontend",
   "private": true,
   "scripts": {
-    "test": "jest --verbose"
+    "test": "vitest run"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^29.7.0"
-  },
-  "jest": {
-    "testEnvironment": "jsdom",
-    "testMatch": [
-      "**/tests/**/*.test.js"
-    ]
+    "jsdom": "^26.1.0",
+    "vitest": "^3.1.1"
   }
 }

@@ -1,6 +1,4 @@
 /**
- * @jest-environment jsdom
- *
  * Unit tests for solver.js — threshold computation, probability formatting,
  * classical/quantum result rendering, and benchmark integration.
  */

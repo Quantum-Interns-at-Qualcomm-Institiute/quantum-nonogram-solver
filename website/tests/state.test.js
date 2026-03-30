@@ -1,5 +1,5 @@
 /**
- * @jest-environment jsdom
+ * Unit tests for state.js — initial state and mode management.
  */
 const { setupDOM, loadState } = require('./helpers');
 

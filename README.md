@@ -153,7 +153,7 @@ quantum-nonogram-solver/
 │   ├── quantum.py             Grover solver (local sim + IBM hardware)
 │   ├── solver.py              Solver ABC + ClassicalSolver, QuantumSimulatorSolver
 │   ├── errors.py              Custom exception hierarchy
-│   ├── data.py                Valid-bitstring lookup table (line lengths 1–6)
+│   ├── data.py                Valid-bitstring lookup table (line lengths 1–10)
 │   ├── io.py                  JSON puzzle serialization
 │   └── metrics.py             Benchmarking & comparison reports
 │
@@ -229,7 +229,7 @@ Run `python tools/webapp.py` — the browser opens automatically at `http://loca
 
 Click the **◀ Puzzle** strip on the left edge to collapse or expand the entire sidebar including the grid editor. The sidebar contains:
 
-- **Rows / Cols** spinners — resize the grid (max 6×6)
+- **Rows / Cols** spinners — resize the grid (max 10×10)
 - **Draw / Clues** toggle — switch between drawing filled cells or typing clue numbers manually
 - **↺ Random** — generate a random filled puzzle
 - **✕ Clear** — reset all cells to empty
@@ -445,6 +445,7 @@ pip install -e "."
 | 4×4 | 16 | 65,536 | ~2 s | Reasonable |
 | 4×6 | 24 | 16.7 M | ~18 min | Slow |
 | 6×6 | 36 | 68.7 B | > days | Infeasible classically |
+| 10×10 | 100 | ~1.27×10^30 | — | Far beyond classical reach |
 
 The classical solver is exponential; Grover's algorithm provides a quadratic speedup in oracle queries, reducing the effective search from O(N) to O(√N).
 
@@ -452,7 +453,7 @@ The classical solver is exponential; Grover's algorithm provides a quadratic spe
 
 ## Limitations
 
-- **Puzzle size cap** — the `possible_d` lookup table covers line lengths 1–6. Larger puzzles require extending the table or replacing it with a generative function.
+- **Puzzle size cap** — the `possible_d` lookup table covers line lengths 1–10, supporting puzzles up to 10×10. Larger puzzles would require extending the table or replacing it with a generative function.
 - **Quantum simulation speed** — Grover simulation on a classical computer is exponential. Puzzles larger than ~3×3 will take minutes to hours in the local simulator; use IBM hardware for larger grids.
 - **NISQ hardware depth** — the PhaseOracleGate boolean synthesis produces deep circuits for puzzles larger than 2×2. Real quantum advantage for nonograms awaits fault-tolerant hardware.
 - **Bitstring convention** — Qiskit uses little-endian bit ordering. All returned bitstrings must be reversed (`bs[::-1]`) before interpreting as row-major grid solutions. This is handled internally in the GUI but must be done manually when using the Python API.
