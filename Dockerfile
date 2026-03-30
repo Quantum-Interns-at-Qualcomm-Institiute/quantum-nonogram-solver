@@ -20,6 +20,4 @@ RUN mkdir -p .certs && \
 
 ENV DEV_CERT_DIR=/app/.certs
 
-EXPOSE 5055
-
 CMD ["python", "tools/webapp.py"]

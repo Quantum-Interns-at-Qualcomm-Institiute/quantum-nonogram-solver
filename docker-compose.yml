@@ -1,8 +1,10 @@
 services:
   nonogram:
+    container_name: nonogram
     build: .
     ports:
-      - "127.0.0.1:${PORT:-5055}:${PORT:-5055}"
+      - "127.0.0.1:${NONOGRAM_PORT}:${NONOGRAM_PORT}"
     environment:
-      PORT: ${PORT:-5055}
+      PORT: "${NONOGRAM_PORT}"
       DEV_CERT_DIR: ""
+      NONOGRAM_HOST: "0.0.0.0"

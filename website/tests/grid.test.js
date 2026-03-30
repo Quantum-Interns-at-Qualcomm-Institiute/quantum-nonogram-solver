@@ -1,6 +1,4 @@
 /**
- * @jest-environment jsdom
- *
  * Unit tests for grid.js — RLE, clue computation, grid sizing, puzzle helpers.
  */
 const { setupDOM, loadState, loadGrid } = require('./helpers');
@@ -200,13 +198,13 @@ describe('getBestSolSize', () => {
 describe('addRow / addCol / deleteRowsFrom / deleteColsFrom', () => {
   beforeEach(() => {
     // Mock fetch to prevent real network calls
-    global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     App.state.rows = 3; App.state.cols = 3;
     App.state.mode = 'draw';
     App.initGrid();
     // Stub rebuildActiveGrid since it needs full DOM
-    App.buildGrid = jest.fn();
-    App.buildClueGrid = jest.fn();
+    App.buildGrid = vi.fn();
+    App.buildClueGrid = vi.fn();
   });
 
   afterEach(() => {
@@ -222,10 +220,10 @@ describe('addRow / addCol / deleteRowsFrom / deleteColsFrom', () => {
   });
 
   test('addRow respects MAX_GRID limit', () => {
-    App.state.rows = 6;
-    App.state.grid = Array.from({ length: 6 }, () => Array(3).fill(false));
+    App.state.rows = MAX_GRID;
+    App.state.grid = Array.from({ length: MAX_GRID }, () => Array(3).fill(false));
     App.addRow();
-    expect(App.state.rows).toBe(6); // unchanged
+    expect(App.state.rows).toBe(MAX_GRID); // unchanged
   });
 
   test('addCol increases col count', () => {
@@ -236,9 +234,9 @@ describe('addRow / addCol / deleteRowsFrom / deleteColsFrom', () => {
   });
 
   test('addCol respects MAX_GRID limit', () => {
-    App.state.cols = 6;
+    App.state.cols = MAX_GRID;
     App.addCol();
-    expect(App.state.cols).toBe(6);
+    expect(App.state.cols).toBe(MAX_GRID);
   });
 
   test('deleteRowsFrom trims grid', () => {

@@ -1,6 +1,0 @@
-services:
-  - name: nonogram-solver
-    display_name: Nonogram
-    compose_service: nonogram
-    default_port: 5055
-    submodule_path: "tools/static/ui-kit/"

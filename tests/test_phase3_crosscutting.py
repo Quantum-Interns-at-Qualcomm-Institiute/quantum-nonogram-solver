@@ -430,7 +430,7 @@ class TestDockerContainerHealth:
 
     def test_webapp_port_configured(self):
         src = _read(TOOLS_DIR / "webapp.py")
-        assert "5055" in src
+        assert "PORT" in src, "webapp must read port from PORT env var"
 
     def test_webapp_ssl_optional(self):
         """Webapp should work with or without SSL certs."""

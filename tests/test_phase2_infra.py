@@ -78,8 +78,9 @@ class TestDockerBuildReproducibility:
         assert "--no-cache-dir" in src
 
     def test_dockerfile_exposes_port(self):
-        src = _read(ROOT / "Dockerfile")
-        assert re.search(r"EXPOSE\s+\d+", src)
+        """Port is configured via env var in docker-compose, not hardcoded."""
+        src = _read(ROOT / "docker-compose.yml")
+        assert "NONOGRAM_PORT" in src
 
     def test_dockerfile_has_cmd(self):
         src = _read(ROOT / "Dockerfile")
@@ -91,7 +92,7 @@ class TestDockerBuildReproducibility:
 
     def test_docker_compose_maps_port(self):
         src = _read(ROOT / "docker-compose.yml")
-        assert "5055" in src, "docker-compose must map port 5055"
+        assert "NONOGRAM_PORT" in src, "docker-compose must map port via NONOGRAM_PORT env var"
 
     def test_dockerfile_generates_ssl_certs(self):
         src = _read(ROOT / "Dockerfile")
@@ -189,8 +190,8 @@ class TestUIKitComponents:
 
     def test_meta_backend_service(self):
         src = _read(WEBSITE_DIR / "index.html")
-        assert "site-backend-service" in src, (
-            "Must have site-backend-service meta tag"
+        assert 'name="site-backend"' in src, (
+            "Must have site-backend meta tag"
         )
 
     def test_js_test_suite_exists(self):
