@@ -170,6 +170,7 @@ class TestClassicalSolveFlow:
 
 try:
     import qiskit  # noqa: F401
+
     from nonogram.quantum import quantum_solve  # noqa: F401
     _HAS_QUANTUM = True
 except (ImportError, Exception):
