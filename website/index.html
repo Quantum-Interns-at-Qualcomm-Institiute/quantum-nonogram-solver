@@ -7,9 +7,9 @@
   <meta name="site-nav-label" content="Nonogram">
   <meta name="site-nav-icon" content="fa-solid fa-puzzle-piece">
   <meta name="site-backend" content="nonogram" data-port="5055" data-label="Nonogram Backend">
-  <script src="/lib/ui-kit/v1.1/theme-bootstrap.js"></script>
-  <script src="/shared/site-nav.js" defer></script>
-  <link rel="stylesheet" href="/lib/ui-kit/v1.1/ui-kit.css">
+  <script src="https://cdn.jsdelivr.net/gh/andypeterson2/ui-kit@ffb2e481f8bc48141115eec32e2671c0323eb0dc/theme-bootstrap.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/andypeterson2/andypeterson2.github.io@main/packages/shared-js/site-nav.js" defer></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/andypeterson2/ui-kit@ffb2e481f8bc48141115eec32e2671c0323eb0dc/ui-kit.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
@@ -202,14 +202,14 @@
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
         crossorigin="anonymous"></script>
-<script src="/lib/ui-kit/v1.1/service-config.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/andypeterson2/andypeterson2.github.io@main/packages/shared-js/service-config.js"></script>
 <script>
   const MAX_CLUES = 3;
   const MAX_GRID  = 10;
-  const API_BASE = (ServiceConfig.resolveBackend || ServiceConfig.get).call(ServiceConfig, "nonogram", "https://localhost:5055");
+  const API_BASE = (ServiceConfig.resolveBackend || ServiceConfig.get).call(ServiceConfig, "nonogram", "http://localhost:5055");
 </script>
-<script src="/lib/ui-kit/v1.1/icons.js"></script>
-<script src="/lib/ui-kit/v1.1/ui-kit.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/andypeterson2/ui-kit@ffb2e481f8bc48141115eec32e2671c0323eb0dc/icons.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/andypeterson2/ui-kit@ffb2e481f8bc48141115eec32e2671c0323eb0dc/ui-kit.js"></script>
 <script src="static/state.js"></script>
 <script src="static/grid.js"></script>
 <script src="static/solver.js"></script>
