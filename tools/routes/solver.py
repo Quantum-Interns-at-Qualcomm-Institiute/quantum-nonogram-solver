@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, request
 
 from tools.chart import render_chart_b64, report_to_dict
 from tools.config import RUNS_DIR
+from tools.errors import respond_error
 from tools.state import emit_status, set_busy, state, state_lock
 
 bp = Blueprint("solver", __name__)
@@ -105,12 +106,12 @@ def api_solve_classical():
     """Trigger a classical (brute-force) solve in a background thread."""
     with state_lock:
         if state["busy"]:
-            return jsonify({"error": "Solver busy"}), 409
+            return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
     data = request.json
     if data is None:
         set_busy(False)
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
     row_clues, col_clues, rows, cols = _parse_clues(data)
 
     from nonogram.io import _validate_clues
@@ -118,7 +119,7 @@ def api_solve_classical():
         _validate_clues(row_clues, col_clues)
     except Exception as e:
         set_busy(False)
-        return jsonify({"error": str(e)}), 400
+        return respond_error("invalid_clues", str(e), 400)
 
     from nonogram.solver import ClassicalSolver
 
@@ -150,12 +151,12 @@ def api_solve_quantum():
     """Trigger a quantum (Grover) solve in a background thread."""
     with state_lock:
         if state["busy"]:
-            return jsonify({"error": "Solver busy"}), 409
+            return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
     data = request.json
     if data is None:
         set_busy(False)
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
     row_clues, col_clues, rows, cols = _parse_clues(data)
 
     from nonogram.io import _validate_clues
@@ -163,7 +164,7 @@ def api_solve_quantum():
         _validate_clues(row_clues, col_clues)
     except Exception as e:
         set_busy(False)
-        return jsonify({"error": str(e)}), 400
+        return respond_error("invalid_clues", str(e), 400)
 
     solver = _get_quantum_solver()
     emit_status(f"{solver.name} running\u2026", "warn")
@@ -201,12 +202,12 @@ def api_benchmark():
     """Run a benchmark comparing classical and quantum solvers."""
     with state_lock:
         if state["busy"]:
-            return jsonify({"error": "Solver busy"}), 409
+            return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
     data = request.json
     if data is None:
         set_busy(False)
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
     row_clues, col_clues, rows, cols = _parse_clues(data)
 
     from nonogram.io import _validate_clues
@@ -214,7 +215,7 @@ def api_benchmark():
         _validate_clues(row_clues, col_clues)
     except Exception as e:
         set_busy(False)
-        return jsonify({"error": str(e)}), 400
+        return respond_error("invalid_clues", str(e), 400)
     trials = max(1, int(data.get("trials", 1)))
     with state_lock:
         hw_cfg = state.get("hw_config")
