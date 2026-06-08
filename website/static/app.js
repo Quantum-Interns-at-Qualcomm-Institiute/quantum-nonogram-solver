@@ -217,7 +217,7 @@ $("hw-fetch-backends").addEventListener("click", async () => {
       body: JSON.stringify({ token, channel }),
     });
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (data.error) throw new Error(data.error.message || data.error);
     const sel = $("hw-backend-select");
     sel.innerHTML = '';
     data.backends.forEach(b => {
@@ -268,7 +268,7 @@ $("btn-delete-runs").addEventListener("click", async () => {
       App.setStatus(`Deleted ${d.deleted} cached run${d.deleted !== 1 ? "s" : ""}.`, "ok");
       App.fetchRunsInfo();
     } else {
-      App.setStatus("Delete failed: " + (d.error || "unknown error"), "err");
+      App.setStatus("Delete failed: " + ((d.error && d.error.message) || "unknown error"), "err");
     }
   } catch(err) { App.setStatus("Delete error: " + err.message, "err"); }
   finally { btn.disabled = state.busy; }

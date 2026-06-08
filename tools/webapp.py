@@ -56,6 +56,7 @@ from flask_socketio import SocketIO  # noqa: E402
 
 from tools import state as app_state  # noqa: E402
 from tools.config import MAX_CLUES, MAX_GRID  # noqa: E402
+from tools.errors import register_error_handlers  # noqa: E402
 from tools.routes import ALL_BLUEPRINTS  # noqa: E402
 
 # ── Flask setup ──────────────────────────────────────────────────────────────
@@ -74,6 +75,9 @@ app_state.init(socketio)
 # Register route blueprints
 for bp in ALL_BLUEPRINTS:
     app.register_blueprint(bp)
+
+# Uniform JSON error envelope for framework-raised errors (404/405/500, ...).
+register_error_handlers(app)
 
 
 # ── Config API (frontend lives in the website repo) ──────────────────────────

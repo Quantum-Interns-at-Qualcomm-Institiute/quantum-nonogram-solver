@@ -7,6 +7,7 @@ import json
 
 from flask import Blueprint, jsonify, request, send_file
 
+from tools.errors import respond_error
 from tools.state import state, state_lock
 
 bp = Blueprint("puzzle", __name__)
@@ -17,7 +18,7 @@ def api_puzzle_load():
     """Load a puzzle from a .non.json file upload."""
     f = request.files.get("file")
     if not f:
-        return jsonify({"error": "No file"}), 400
+        return respond_error("no_file", "No file", 400)
     import os
     import tempfile
 
@@ -52,7 +53,7 @@ def api_puzzle_save():
     """Download the current puzzle as a .non.json file."""
     data = request.json
     if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
     row_clues = [tuple(c) for c in data["row_clues"]]
     col_clues = [tuple(c) for c in data["col_clues"]]
     name = data.get("name", state["puzzle_name"]) or "puzzle"
