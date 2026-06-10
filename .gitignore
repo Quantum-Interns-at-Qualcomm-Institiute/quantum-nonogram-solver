@@ -19,5 +19,8 @@ env/
 # Testing
 htmlcov/
 
+# Run artifacts
+runs/
+
 # OS
 Thumbs.db
