@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://andypeterson.dev/api-contract/error.schema.json",
+  "title": "Error envelope",
+  "description": "Body returned for any 4xx/5xx response. The HTTP status code carries the error class; the envelope carries a stable machine code and a human message.",
+  "type": "object",
+  "required": ["error"],
+  "properties": {
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "description": "Stable, machine-readable slug (snake_case). Safe to switch on in clients.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "message": {
+          "description": "Human-readable explanation. Not guaranteed stable.",
+          "type": "string",
+          "minLength": 1
+        },
+        "details": {
+          "description": "Optional structured context (any JSON value): field errors, limits, ids, etc."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
