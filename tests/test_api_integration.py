@@ -375,18 +375,29 @@ class TestRunsInfoDeleteCycle:
 
     def test_full_cycle_benchmark_creates_run_then_delete(self, http_client):
         """Run a benchmark (creates a run file) then delete and verify."""
+        # Start from a clean slate: the autouse reset clears in-memory state but
+        # not the runs directory, so without this the test could pass on run
+        # files left by earlier tests (and fail in isolation). Delete first so
+        # the count assertion below reflects only this test's own benchmark.
+        http_client.post("/api/runs/delete")
+
         http_client.post("/api/benchmark", json={
             "row_clues": SIMPLE_ROW_CLUES,
             "col_clues": SIMPLE_COL_CLUES,
             "trials": 1,
         })
-        # Wait for background solve to finish and save the run file
-        time.sleep(5)
 
-        # Check that at least one run exists
-        rv = http_client.get("/api/runs/info")
-        info_before = rv.get_json()
-        assert info_before["count"] >= 1
+        # The benchmark solves in a background thread and then writes the run
+        # file, so poll for it rather than assuming a fixed duration — a cold
+        # solve can take longer than any single sleep would reliably cover.
+        deadline = time.monotonic() + 30
+        info_before = {"count": 0}
+        while time.monotonic() < deadline:
+            info_before = http_client.get("/api/runs/info").get_json()
+            if info_before["count"] >= 1:
+                break
+            time.sleep(0.25)
+        assert info_before["count"] >= 1, "benchmark did not produce a run file in time"
 
         # Delete all runs
         rv = http_client.post("/api/runs/delete")
