@@ -11,7 +11,6 @@ Tests cover WPs #716-#720:
 from __future__ import annotations
 
 import ast
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
