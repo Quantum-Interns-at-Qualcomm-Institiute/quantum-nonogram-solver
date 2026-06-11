@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://andypeterson.dev/api-contract/manifest.schema.json",
+  "title": "API discovery manifest",
+  "description": "Body returned by GET /api — the service's self-description of its HTTP surface and any optional streaming channels. Lets a client (or curl) discover every operation with no frontend.",
+  "type": "object",
+  "required": ["service", "endpoints"],
+  "properties": {
+    "service": {
+      "description": "Canonical service slug.",
+      "type": "string",
+      "enum": ["cv", "nonogram", "classifiers", "qvc"]
+    },
+    "version": {
+      "description": "Service version (semver or git short SHA).",
+      "type": "string"
+    },
+    "endpoints": {
+      "description": "Every synchronous HTTP operation the service exposes. Per the curl-able rule, every operation appears here.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["method", "path"],
+        "properties": {
+          "method": {
+            "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "streaming": {
+      "description": "Optional real-time channels layered on top of the HTTP surface (Socket.IO / SSE / WebSocket / WebRTC). Informational; never the only way to reach a result.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["protocol"],
+        "properties": {
+          "protocol": {
+            "enum": ["socket.io", "sse", "websocket", "webrtc"]
+          },
+          "event": {
+            "description": "Socket.IO event name, where applicable.",
+            "type": "string"
+          },
+          "channel": {
+            "description": "SSE channel / stream name, where applicable.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Connection path, where applicable (e.g. the SSE or WS endpoint).",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

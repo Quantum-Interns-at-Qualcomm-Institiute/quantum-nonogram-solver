@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://andypeterson.dev/api-contract/health.schema.json",
+  "title": "Service health response",
+  "description": "Body returned by GET /health (and the CV alias GET /api/health) for every backend. Extra service-specific keys (e.g. persons, clients) are allowed.",
+  "type": "object",
+  "required": ["status", "service"],
+  "properties": {
+    "status": {
+      "description": "Liveness/readiness summary.",
+      "enum": ["ok", "degraded", "error"]
+    },
+    "service": {
+      "description": "Canonical service slug. One of the four backends.",
+      "type": "string",
+      "enum": ["cv", "nonogram", "classifiers", "qvc"]
+    },
+    "version": {
+      "description": "Service version (semver or git short SHA).",
+      "type": "string",
+      "minLength": 1
+    },
+    "uptime_s": {
+      "description": "Seconds since process start.",
+      "type": "number",
+      "minimum": 0
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "ok" } } },
+      "then": { "required": ["version", "uptime_s"] }
+    }
+  ],
+  "additionalProperties": true
+}

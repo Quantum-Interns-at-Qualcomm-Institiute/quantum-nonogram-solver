@@ -7,6 +7,7 @@ import json
 from flask import Blueprint, jsonify
 
 from tools.config import RUNS_DIR
+from tools.errors import respond_error
 from tools.state import state, state_lock
 
 bp = Blueprint("runs", __name__)
@@ -42,7 +43,7 @@ def api_runs_delete():
     with state_lock:
         busy = state["busy"]
     if busy:
-        return jsonify({"ok": False, "error": "A run is in progress"}), 409
+        return respond_error("solver_busy", "A run is in progress", 409)
     deleted = 0
     for f in RUNS_DIR.glob("run_*.json"):
         try:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 
 from tools import state as _state_mod
+from tools.errors import respond_error
 from tools.state import emit_status, state, state_lock
 
 bp = Blueprint("hardware", __name__)
@@ -15,7 +16,7 @@ def api_hw_backends():
     """List available IBM quantum backends."""
     data = request.json
     if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
     try:
         from nonogram.quantum import list_backends
 
@@ -24,7 +25,7 @@ def api_hw_backends():
             {"backends": [{"name": b[0], "qubits": b[1], "pending": b[2]} for b in backends]}
         )
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 400
+        return respond_error("hardware_error", str(exc), 400)
 
 
 @bp.route("/api/hw/config", methods=["POST"])

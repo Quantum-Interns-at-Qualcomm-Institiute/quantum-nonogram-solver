@@ -246,7 +246,7 @@ class TestPuzzleLoadInvalidJSON:
         rv = http_client.post("/api/puzzle/load", data={},
                               content_type="multipart/form-data")
         assert rv.status_code == 400
-        assert rv.get_json()["error"] == "No file"
+        assert rv.get_json()["error"]["message"] == "No file"
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ class TestConcurrentSolveRejection:
             "col_clues": SIMPLE_COL_CLUES,
         })
         assert rv.status_code == 409
-        assert "busy" in rv.get_json()["error"].lower()
+        assert "busy" in rv.get_json()["error"]["message"].lower()
 
     def test_quantum_solve_rejected_when_busy(self, http_client):
         from tools.state import state, state_lock
@@ -316,7 +316,7 @@ class TestConcurrentSolveRejection:
             "col_clues": SIMPLE_COL_CLUES,
         })
         assert rv.status_code == 409
-        assert "busy" in rv.get_json()["error"].lower()
+        assert "busy" in rv.get_json()["error"]["message"].lower()
 
     def test_benchmark_rejected_when_busy(self, http_client):
         from tools.state import state, state_lock

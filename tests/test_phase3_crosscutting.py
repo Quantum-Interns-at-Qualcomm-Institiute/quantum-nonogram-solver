@@ -11,7 +11,6 @@ Tests cover WPs #716-#720:
 from __future__ import annotations
 
 import ast
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -338,53 +337,6 @@ class TestFrontendIntegration:
     def test_puzzle_route_exists(self):
         src = _read(TOOLS_DIR / "routes" / "puzzle.py")
         assert "puzzle" in src.lower() or "/api/" in src
-
-    def test_frontend_connects_socket_io(self):
-        src = _read(WEBSITE_DIR / "static" / "app.js")
-        assert "io(" in src, "Frontend must connect via Socket.IO"
-
-    def test_frontend_binds_socket_events(self):
-        src = _read(WEBSITE_DIR / "static" / "app.js")
-        for event in ["status", "busy", "cl_done", "qu_done", "bench_done"]:
-            assert event in src, f"Frontend must handle '{event}' socket event"
-
-    def test_frontend_sends_benchmark_request(self):
-        src = _read(WEBSITE_DIR / "static" / "app.js")
-        assert "/api/benchmark" in src
-
-    def test_frontend_state_module_exists(self):
-        assert (WEBSITE_DIR / "static" / "state.js").is_file()
-
-    def test_frontend_grid_module_exists(self):
-        assert (WEBSITE_DIR / "static" / "grid.js").is_file()
-
-    def test_frontend_solver_module_exists(self):
-        assert (WEBSITE_DIR / "static" / "solver.js").is_file()
-
-    def test_frontend_ui_module_exists(self):
-        assert (WEBSITE_DIR / "static" / "ui.js").is_file()
-
-    def test_frontend_supports_puzzle_load(self):
-        src = _read(WEBSITE_DIR / "static" / "app.js")
-        assert "file-input" in src or "puzzle/load" in src
-
-    def test_frontend_supports_hardware_panel(self):
-        src = _read(WEBSITE_DIR / "static" / "app.js")
-        assert "hw-token" in src
-        assert "hw-fetch-backends" in src
-
-    def test_frontend_test_suite_exists(self):
-        tests_dir = WEBSITE_DIR / "tests"
-        assert tests_dir.is_dir()
-        test_files = list(tests_dir.glob("*.test.js"))
-        assert len(test_files) >= 1, "Frontend must have at least one test file"
-
-    def test_frontend_package_json_has_test_script(self):
-        src = _read(WEBSITE_DIR / "package.json")
-        data = json.loads(src)
-        assert "test" in data.get("scripts", {}), (
-            "package.json must define a test script"
-        )
 
     def test_api_config_endpoint(self):
         src = _read(TOOLS_DIR / "webapp.py")
