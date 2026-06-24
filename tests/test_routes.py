@@ -40,6 +40,10 @@ def app():
     )
     test_app.config["TESTING"] = True
     test_app.config["SECRET_KEY"] = "test"
+    # Mirror the production body-size guard (see tools/webapp.py).
+    from tools.config import MAX_CONTENT_LENGTH
+
+    test_app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
     sio = SocketIO(test_app, async_mode="threading")
     app_state.init(sio)
@@ -213,6 +217,46 @@ class TestSolverRoutes:
         resp = client.post("/api/benchmark", json=payload)
         assert resp.status_code == 200
         assert resp.get_json()["ok"] is True
+
+
+class TestSolveDoSGuards:
+    """P0: solve routes cap grid AREA (both solvers are exponential in rows*cols)
+    and request-body size, and never leave the solver wedged 'busy' on a bad body."""
+
+    # 5×5 = 25 cells, over the 20-cell solve cap.
+    OVERSIZED = {"row_clues": [[1]] * 5, "col_clues": [[1]] * 5}
+
+    def test_classical_rejects_oversized_grid(self, client):
+        resp = client.post("/api/solve/classical", json=self.OVERSIZED)
+        assert resp.status_code == 400
+        assert "cell" in resp.get_data(as_text=True).lower()
+
+    def test_quantum_rejects_oversized_grid(self, client):
+        resp = client.post("/api/solve/quantum", json=self.OVERSIZED)
+        assert resp.status_code == 400
+
+    def test_benchmark_rejects_oversized_grid(self, client):
+        resp = client.post("/api/benchmark", json={**self.OVERSIZED, "trials": 1})
+        assert resp.status_code == 400
+
+    def test_oversized_body_rejected_with_413(self, client):
+        big = b'{"row_clues":[' + b"[1]," * 80000 + b'[1]],"col_clues":[[1]]}'  # > 256 KB
+        resp = client.post("/api/solve/classical", data=big, content_type="application/json")
+        assert resp.status_code == 413
+
+    def test_bad_request_does_not_wedge_busy(self, client):
+        # An oversized-grid 400 must NOT hold the busy lock — a valid solve still runs.
+        from tools.state import state, state_lock
+
+        assert client.post("/api/solve/classical", json=self.OVERSIZED).status_code == 400
+        ok = client.post(
+            "/api/solve/classical", json={"row_clues": [[2], [2]], "col_clues": [[2], [2]]}
+        )
+        assert ok.status_code == 200
+
+        # Clean up the background solve's busy flag.
+        with state_lock:
+            state["busy"] = False
 
 
 # ---------------------------------------------------------------------------
