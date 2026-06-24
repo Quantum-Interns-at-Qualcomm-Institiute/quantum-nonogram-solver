@@ -55,12 +55,15 @@ from flask_cors import CORS  # noqa: E402
 from flask_socketio import SocketIO  # noqa: E402
 
 from tools import state as app_state  # noqa: E402
-from tools.config import MAX_CLUES, MAX_GRID  # noqa: E402
+from tools.config import MAX_CLUES, MAX_CONTENT_LENGTH, MAX_GRID  # noqa: E402
 from tools.errors import register_error_handlers  # noqa: E402
 from tools.routes import ALL_BLUEPRINTS  # noqa: E402
 
 # ── Flask setup ──────────────────────────────────────────────────────────────
 app = Flask(__name__)
+# Cap request bodies — clues are a few hundred bytes of JSON; this rejects
+# oversized payloads with a 413 before Flask parses them.
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 app.secret_key = os.environ.get("NONOGRAM_SECRET_KEY", os.urandom(32).hex())
 CORS(app, origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*,https://andypeterson.dev").split(","))
 socketio = SocketIO(
