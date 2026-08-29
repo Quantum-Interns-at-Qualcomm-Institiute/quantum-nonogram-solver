@@ -139,7 +139,7 @@ class TestPuzzleRoutes:
 
         from io import BytesIO
 
-        with open(puzzle_file, "rb") as f:
+        with puzzle_file.open("rb") as f:
             data = BytesIO(f.read())
         data.seek(0)
 
