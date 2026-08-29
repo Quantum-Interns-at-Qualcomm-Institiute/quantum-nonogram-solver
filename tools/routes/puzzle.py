@@ -19,8 +19,8 @@ def api_puzzle_load():
     f = request.files.get("file")
     if not f:
         return respond_error("no_file", "No file", 400)
-    import os
     import tempfile
+    from pathlib import Path
 
     from nonogram.io import load_puzzle
 
@@ -29,7 +29,7 @@ def api_puzzle_load():
         try:
             data = load_puzzle(tmp.name)
         finally:
-            os.unlink(tmp.name)
+            Path(tmp.name).unlink()
     row_clues = [list(r) for r in data["row_clues"]]
     col_clues = [list(c) for c in data["col_clues"]]
     with state_lock:

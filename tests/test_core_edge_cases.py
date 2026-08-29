@@ -35,7 +35,7 @@ class TestVarClausesEdgeCases:
         assert col_vars[0] == [0, 1, 2, 3, 4]
 
     def test_6x6_max_grid(self):
-        row_vars, col_vars = var_clauses(6, 6)
+        row_vars, _col_vars = var_clauses(6, 6)
         flat = [v for row in row_vars for v in row]
         assert flat == list(range(36))
 

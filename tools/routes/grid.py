@@ -46,7 +46,7 @@ def api_randomize():
     cols = int(data.get("cols", state.get("cols", 5)))
     if not (1 <= rows <= MAX_GRID and 1 <= cols <= MAX_GRID):
         return respond_error("invalid_dimensions", f"Grid dimensions must be 1-{MAX_GRID}", 400)
-    grid = [[random.random() > 0.5 for _ in range(cols)] for _ in range(rows)]
+    grid = [[random.random() > 0.5 for _ in range(cols)] for _ in range(rows)]  # noqa: S311 — puzzle randomization, not cryptography
     with state_lock:
         state["rows"] = rows
         state["cols"] = cols

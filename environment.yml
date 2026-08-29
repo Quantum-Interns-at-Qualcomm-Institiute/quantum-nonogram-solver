@@ -15,4 +15,4 @@ dependencies:
     - numpy
     - matplotlib
     - scipy
-    - -e .        # installs the nonogram package in editable mode
+    - -e ".[dev]" # installs the nonogram package (editable) + pytest/ruff dev tools

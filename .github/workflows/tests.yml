@@ -24,13 +24,13 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      # Lint first — fast feedback, and it uses the ruff pinned by the [dev]
+      # extra rather than a floating pip install.
+      - name: Lint
+        run: ruff check .
+
       - name: Run tests
         run: pytest tests/ -v --tb=short -m "not slow"
-
-      - name: Lint
-        run: |
-          pip install ruff
-          ruff check .
 
   contract:
     runs-on: ubuntu-latest

@@ -137,8 +137,8 @@ class TestSATEncodingIntegration:
             grid = [[sol[i * 2 + j] == "1" for j in range(2)] for i in range(2)]
             row_clues, col_clues = grid_to_clues(grid)
             # Check row clues match
-            for actual, expected in zip(row_clues, puzzle[0]):
+            for actual, expected in zip(row_clues, puzzle[0], strict=True):
                 assert actual == expected
             # Check col clues match
-            for actual, expected in zip(col_clues, puzzle[1]):
+            for actual, expected in zip(col_clues, puzzle[1], strict=True):
                 assert actual == expected

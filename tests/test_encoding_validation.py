@@ -343,7 +343,7 @@ class TestMultiBlockClues:
 
     def test_multi_block_classical_clause_structure(self):
         """Classical clauses for a multi-block clue should have multiple subclauses."""
-        clauses, num_vars = puzzle_to_boolean(
+        clauses, _num_vars = puzzle_to_boolean(
             [(1, 1), (0,)], [(1,), (0,), (1,)], classical=True
         )
         # Row 0 constraint for clue (1,1) on 3 cells: 1 pattern (101)
@@ -424,10 +424,9 @@ class TestClassicalRejection:
                         if bits[var_idx] != 1:
                             clause_sat = False
                             break
-                    else:
-                        if bits[var_idx] != 0:
-                            clause_sat = False
-                            break
+                    elif bits[var_idx] != 0:
+                        clause_sat = False
+                        break
                 if clause_sat:
                     group_sat = True
                     break
