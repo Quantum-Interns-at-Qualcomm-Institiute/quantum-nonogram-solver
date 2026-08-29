@@ -5,12 +5,12 @@ the contract surface (``/health``, ``/api`` discovery, error envelope) against
 the JSON Schemas, plus the read shapes the static frontend relies on.
 """
 
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, str(Path(__file__).parent))
 
-from _contract import (  # noqa: E402
+from _contract import (
     assert_matches,
     base_url,
     http_get,

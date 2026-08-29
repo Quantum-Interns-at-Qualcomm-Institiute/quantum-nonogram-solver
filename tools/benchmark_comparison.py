@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+from pathlib import Path
 
 from nonogram.metrics import benchmark, print_report
 
@@ -161,7 +162,7 @@ def run_comparison(
     print("  Circuit depth overhead: O(log N) per iteration\n")
 
     if output_json:
-        with open(output_json, "w") as f:
+        with Path(output_json).open("w") as f:
             json.dump(results, f, indent=2, default=str)
         print(f"  Results written to {output_json}\n")
 

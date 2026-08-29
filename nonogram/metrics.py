@@ -391,7 +391,7 @@ def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
 
 def _hamming_distance(a: str, b: str) -> int:
     """Count differing bits between two equal-length bitstrings."""
-    return sum(x != y for x, y in zip(a, b))
+    return sum(x != y for x, y in zip(a, b, strict=True))
 
 
 def compute_solution_space_metrics(
@@ -445,8 +445,12 @@ def compute_confidence_runs(
     expected = num_solutions * h_n / top_probability
 
     # For P(all found) ≥ 1-δ, multiply expected by ln(1/δ) factor
-    runs_95 = expected * math.log(1 / 0.05) if num_solutions > 1 else math.log(1 / 0.05) / top_probability
-    runs_99 = expected * math.log(1 / 0.01) if num_solutions > 1 else math.log(1 / 0.01) / top_probability
+    runs_95 = (
+        expected * math.log(1 / 0.05) if num_solutions > 1 else math.log(1 / 0.05) / top_probability
+    )
+    runs_99 = (
+        expected * math.log(1 / 0.01) if num_solutions > 1 else math.log(1 / 0.01) / top_probability
+    )
 
     return runs_95, runs_99
 
@@ -469,7 +473,9 @@ def _distribution_entropy(counts: dict[str, int | float]) -> float:
 # ---------------------------------------------------------------------------
 
 
-def benchmark(
+# The benchmark orchestrator runs both solvers end-to-end and assembles one
+# report; it is long but linear, so the statement budget is waived here.
+def benchmark(  # noqa: PLR0915
     puzzle: tuple[list, list],
     run_classical: bool = True,
     run_quantum: bool = True,
@@ -650,7 +656,9 @@ def benchmark(
 # ---------------------------------------------------------------------------
 
 
-def print_report(report: ComparisonReport) -> None:
+# Formats every report section in sequence — long but linear, waived like
+# benchmark() above.
+def print_report(report: ComparisonReport) -> None:  # noqa: C901, PLR0915
     """Print a formatted side-by-side comparison of the benchmark results."""
     W = 28  # column width for value fields
 

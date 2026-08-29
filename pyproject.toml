@@ -20,7 +20,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0,<9.0",
-    "ruff>=0.4",
+    # Compatible-release pin: the enforced rule set shifts with ruff minors, so
+    # CI must not float across them.
+    "ruff~=0.15.16",
 ]
 
 [tool.setuptools.packages.find]
@@ -30,7 +32,42 @@ include = ["nonogram*", "tools*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# The demo notebook is presentation material, not library code.
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I"]
-ignore = ["E501"]
+# Complexity budgets (C90/PLR) + rewrite-to-shorter families (SIM/RET/C4/PIE/
+# PERF/FURB/PTH) on top of the correctness floor. Deliberately excluded as
+# noise for this codebase: D, ANN, EM, FBT, COM, Q.
+select = [
+  "E", "W", "F", "I",             # correctness + style + imports
+  "N", "UP", "B", "A",            # naming, modernize, bugbear, builtin-shadowing
+  "S", "T20",                     # security, stray prints
+  "C90", "PLR", "PLW", "PLE",     # complexity budgets: mccabe + pylint
+  "SIM", "RET", "RSE", "PIE", "C4",  # simplify, returns, comprehensions
+  "PERF", "FURB", "PTH",          # perf anti-patterns, modern idioms, pathlib
+  "ARG", "ISC", "TID", "TRY", "RUF",
+]
+ignore = [
+  "TRY003",   # long exception messages — verbosity pedantry
+  "PLR2004",  # magic-value comparisons — noisy outside tests
+  "RUF001", "RUF002", "RUF003",  # typographic chars (×, arrows) in report output/prose are intentional
+  "PERF203",  # try/except in loop — flags legitimate per-item error isolation
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S104", "S105", "S110", "S310", "PLR0913", "ARG", "T201", "N806", "RUF012"]
+# print() is the product on these surfaces: the metrics report generator, the
+# verbose-mode solver tracing, the grid display helpers, and the CLI benchmark.
+# N806: SAT-encoder symbols (AND/OR/VAR/NOT) and layout constants are named as
+# the domain writes them.
+"nonogram/metrics.py" = ["T201", "N806"]
+"nonogram/classical.py" = ["T201"]
+"nonogram/core.py" = ["T201", "N806"]
+"tools/benchmark_comparison.py" = ["T201"]
+# Route signatures mirror the API's parameter surface; slated for a dataclass
+# refactor rather than a threshold bump.
+"tools/routes/solver.py" = ["PLR0913"]

@@ -58,7 +58,10 @@ class ExecutionCounts:
         return self.clause_evaluations / self.candidates_evaluated
 
 
-def classical_solve(
+# The brute-force CNF evaluator is one hot loop over candidates x clauses x
+# literals; splitting it would scatter the loop, so the complexity budget is
+# waived here rather than raised globally.
+def classical_solve(  # noqa: C901, PLR0912
     puzzle: tuple[list, list],
     manual_check: str | None = None,
     verbose: bool = False,
@@ -114,7 +117,7 @@ def classical_solve(
         if manual_check is not None:
             configuration = manual_check
         else:
-            configuration = bin(candidate)[2:].zfill(var_num)[::-1]
+            configuration = f"{candidate:b}".zfill(var_num)[::-1]
 
         if counts is not None:
             counts.candidates_evaluated += 1

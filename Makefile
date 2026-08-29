@@ -17,11 +17,12 @@ PYTHON       = $(ENV_PREFIX)/bin/python
 PIP          = $(ENV_PREFIX)/bin/pip
 JUPYTER      = $(ENV_PREFIX)/bin/jupyter
 PYTEST       = $(ENV_PREFIX)/bin/pytest
+RUFF         = $(ENV_PREFIX)/bin/ruff
 
 KERNEL_NAME  = quantum-nonogram
 KERNEL_LABEL = Quantum Nonogram (Python 3.11)
 
-.PHONY: help env install kernel lab app test clean
+.PHONY: help env install kernel lab app test lint clean
 
 # ── help ──────────────────────────────────────────────────────────────────────
 help:
@@ -32,6 +33,7 @@ help:
 	@echo "  make lab      Launch JupyterLab"
 	@echo "  make app      Launch the web app (Flask)"
 	@echo "  make test     Run pytest"
+	@echo "  make lint     Run ruff over the whole repo"
 	@echo "  make clean    Remove __pycache__ and .pytest_cache"
 	@echo ""
 
@@ -76,6 +78,10 @@ app:
 # ── test ──────────────────────────────────────────────────────────────────────
 test:
 	$(PYTEST) tests/ -v
+
+# ── lint ──────────────────────────────────────────────────────────────────────
+lint:
+	$(RUFF) check .
 
 # ── clean ─────────────────────────────────────────────────────────────────────
 clean:

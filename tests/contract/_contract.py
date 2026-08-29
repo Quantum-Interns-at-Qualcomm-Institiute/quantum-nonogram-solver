@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 import pytest
 
 pytest.importorskip("jsonschema", reason="contract tests require jsonschema")
-from jsonschema import Draft202012Validator  # noqa: E402
+from jsonschema import Draft202012Validator
 
 _SCHEMA_DIR = Path(__file__).resolve().parent / "schemas"
 _VALIDATORS: dict = {}

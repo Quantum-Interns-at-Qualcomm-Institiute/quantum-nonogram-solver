@@ -25,7 +25,7 @@ socketio: SocketIO | None = None
 
 def init(sio: SocketIO) -> None:
     """Bind the SocketIO instance so helpers can emit."""
-    global socketio
+    global socketio  # noqa: PLW0603 — module-level SocketIO singleton, bound once at app startup
     socketio = sio
 
 
