@@ -60,7 +60,10 @@ def quantum_solve(puzzle: tuple[list, list]):
 # ---------------------------------------------------------------------------
 
 
-def quantum_solve_hardware(
+# The parameters mirror the physical knobs of an IBM hardware run (backend,
+# shots, iterations, error-mitigation toggles); a config object would just
+# rename the same surface.
+def quantum_solve_hardware(  # noqa: PLR0913
     puzzle: tuple[list, list],
     token: str,
     backend_name: str | None = None,
@@ -178,8 +181,8 @@ def quantum_solve_hardware(
             sampler.options.dynamical_decoupling.enable = True
             # XpXm sequence works well across IBM Eagle/Heron backends.
             sampler.options.dynamical_decoupling.sequence_type = "XpXm"
-        except Exception:
-            pass  # option not supported by this runtime version — skip silently
+        except Exception:  # noqa: S110 — best-effort: option not supported by this runtime version
+            pass
 
     # Pauli gate + measurement twirling converts coherent errors into
     # depolarising noise, which is easier to characterise and average away.
@@ -187,8 +190,8 @@ def quantum_solve_hardware(
         try:
             sampler.options.twirling.enable_gates = True
             sampler.options.twirling.enable_measure = True
-        except Exception:
-            pass  # option not supported — skip silently
+        except Exception:  # noqa: S110 — best-effort: option not supported by this runtime version
+            pass
 
     job = sampler.run([transpiled])
     result = job.result()  # blocks until IBM job is complete
@@ -197,7 +200,9 @@ def quantum_solve_hardware(
     return counts, backend.name
 
 
-def extract_counts(data, creg_names: list[str]) -> dict[str, int]:
+# Defensive parser across six qiskit result-format generations; each branch is
+# one probe, so the branch budget is waived here rather than raised globally.
+def extract_counts(data, creg_names: list[str]) -> dict[str, int]:  # noqa: C901, PLR0912
     """Extract measurement counts from a Qiskit DataBin.
 
     IBM's DataBin format varies across qiskit-ibm-runtime versions.
@@ -252,7 +257,7 @@ def extract_counts(data, creg_names: list[str]) -> dict[str, int]:
 
     # 3. data.keys() (dict-like interface)
     if bit_array is None and hasattr(data, "keys") and callable(data.keys):
-        for fname in data.keys():
+        for fname in data:
             if _try(fname):
                 break
 
@@ -268,9 +273,8 @@ def extract_counts(data, creg_names: list[str]) -> dict[str, int]:
     # 5. dir() scan
     if bit_array is None:
         for attr in dir(data):
-            if not attr.startswith("_"):
-                if _try(attr):
-                    break
+            if not attr.startswith("_") and _try(attr):
+                break
 
     # 6. Hard-coded common register names
     if bit_array is None:
@@ -279,10 +283,11 @@ def extract_counts(data, creg_names: list[str]) -> dict[str, int]:
                 break
 
     if bit_array is None:
-        _discovered: list[str] = []
-        for attr in ("_fields", "__dataclass_fields__"):
-            if hasattr(data, attr):
-                _discovered.append(f"{attr}={getattr(data, attr)!r}")
+        _discovered: list[str] = [
+            f"{attr}={getattr(data, attr)!r}"
+            for attr in ("_fields", "__dataclass_fields__")
+            if hasattr(data, attr)
+        ]
         _public = [a for a in dir(data) if not a.startswith("_")]
         raise QuantumSolverError(
             f"Could not extract measurement counts from DataBin.\n"

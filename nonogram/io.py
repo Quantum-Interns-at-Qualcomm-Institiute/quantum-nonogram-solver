@@ -44,9 +44,17 @@ from typing import Any
 
 from nonogram.errors import PuzzleIOError, ValidationError
 
-__all__ = ["save_puzzle", "load_puzzle", "save_batch", "load_batch"]
+__all__ = ["load_batch", "load_puzzle", "save_batch", "save_puzzle"]
 
 _MAX_LINE = 10  # matches config.py MAX_GRID and data.py lookup table
+# Hard cap on the solvable grid AREA. Both solvers are exponential in rows*cols:
+# the quantum simulator allocates a 2**(rows*cols) statevector and the classical
+# solver brute-forces 2**(rows*cols) candidates, so the per-line cap above is not
+# enough on its own — a 10×10 puzzle is 2**100. 20 cells (e.g. 4×5) is ~2**20,
+# which stays fast and small. The web solve/benchmark routes pass this to
+# _validate_clues as max_cells; library save/load omits it (storing a puzzle does
+# no compute), so serialization of larger grids is unaffected.
+_MAX_CELLS = 20
 
 
 # ---------------------------------------------------------------------------
@@ -54,8 +62,14 @@ _MAX_LINE = 10  # matches config.py MAX_GRID and data.py lookup table
 # ---------------------------------------------------------------------------
 
 
-def _validate_clues(row_clues: list, col_clues: list) -> None:
-    """Raise ValidationError if clues are obviously malformed."""
+def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
+    """Raise ValidationError if clues are obviously malformed.
+
+    When ``max_cells`` is given, also reject puzzles whose grid AREA
+    (len(row_clues) * len(col_clues)) exceeds it — a solve-time DoS guard the web
+    solve/benchmark routes pass (both solvers are exponential in area). Library
+    save/load omits it, so any size up to the per-line cap can still be stored.
+    """
     for i, clue in enumerate(row_clues):
         for v in clue:
             if not isinstance(v, int) or v < 0:
@@ -73,6 +87,13 @@ def _validate_clues(row_clues: list, col_clues: list) -> None:
             f"Puzzle exceeds maximum supported size ({_MAX_LINE}×{_MAX_LINE}). "
             f"Got {len(row_clues)}×{len(col_clues)}."
         )
+    if max_cells is not None:
+        cells = len(row_clues) * len(col_clues)
+        if cells > max_cells:
+            raise ValidationError(
+                f"Puzzle is too large to solve: {len(row_clues)}×{len(col_clues)} = {cells} cells "
+                f"exceeds the {max_cells}-cell limit (both solvers are exponential in grid area)."
+            )
 
 
 def _slugify(name: str) -> str:
@@ -152,8 +173,7 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
     # Normalise older/hand-written files that may omit optional keys
     # Strip both suffixes for .non.json files (path.stem only removes one)
     stem = path.stem
-    if stem.endswith(".non"):
-        stem = stem[:-4]
+    stem = stem.removesuffix(".non")
     data.setdefault("name", stem)
     data.setdefault("tags", [])
     data.setdefault("created", "")

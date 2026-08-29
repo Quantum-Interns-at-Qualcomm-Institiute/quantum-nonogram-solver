@@ -21,11 +21,11 @@ def api_runs_info():
     timestamps: list[str] = []
     for f in files:
         try:
-            with open(f) as fh:
+            with f.open() as fh:
                 d = json.load(fh)
             if d.get("timestamp"):
                 timestamps.append(d["timestamp"])
-        except Exception:
+        except Exception:  # noqa: S110 — best-effort: skip unreadable/corrupt run files
             pass
     return jsonify(
         {
@@ -49,6 +49,6 @@ def api_runs_delete():
         try:
             f.unlink()
             deleted += 1
-        except Exception:
+        except Exception:  # noqa: S110 — best-effort: a locked/vanished file just isn't counted
             pass
     return jsonify({"ok": True, "deleted": deleted})

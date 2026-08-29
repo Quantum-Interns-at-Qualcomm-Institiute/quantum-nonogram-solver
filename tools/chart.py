@@ -122,7 +122,7 @@ def render_chart_b64(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 3.5), facecolor=BG_CARD)
     fig.suptitle("Solver Benchmark Comparison", color=FG_MAIN, fontsize=12, fontweight="bold")
 
-    SPINE = "#c0c8d0"
+    SPINE = "#c0c8d0"  # noqa: N806 — chart style constant, named like its FG_/BG_ siblings
 
     def _style(ax: Any, title: str) -> None:
         ax.set_facecolor("#f4f8fc")
@@ -154,7 +154,7 @@ def render_chart_b64(
             error_kw={"color": FG_MAIN},
         )
         ax1.set_ylabel("seconds", color=FG_MAIN, fontsize=8)
-        for bar, v in zip(bars, vals):
+        for bar, v in zip(bars, vals, strict=True):
             ax1.text(
                 bar.get_x() + bar.get_width() / 2,
                 v * 1.03,
@@ -181,7 +181,7 @@ def render_chart_b64(
         ax2.set_ylabel("count", color=FG_MAIN, fontsize=8)
         ax2.tick_params(axis="x", rotation=12, colors=FG_MAIN)
         ax2.tick_params(axis="y", colors=FG_MAIN)
-        for bar, v in zip(bars, q_vals):
+        for bar, v in zip(bars, q_vals, strict=True):
             ax2.text(
                 bar.get_x() + bar.get_width() / 2,
                 v + 0.05,

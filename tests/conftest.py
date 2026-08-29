@@ -33,9 +33,9 @@ def load_ibm_token() -> str | None:
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if not env_path.exists():
         return None
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
         if line.startswith("IBM_QUANTUM_TOKEN="):
             tok = line[len("IBM_QUANTUM_TOKEN=") :].strip()
-            return tok if tok else None
+            return tok or None
     return None
