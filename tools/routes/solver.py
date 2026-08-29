@@ -43,7 +43,7 @@ def _save_run(payload: dict) -> None:
     """Persist run payload as JSON to RUNS_DIR; errors are non-fatal."""
     try:
         run_file = RUNS_DIR / f"run_{payload['run_id']}.json"
-        with open(run_file, "w") as fh:
+        with run_file.open("w") as fh:
             json.dump(payload, fh, indent=2)
     except Exception as exc:
         import logging
@@ -357,7 +357,9 @@ def api_benchmark():
             payload = _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg)
             socketio.emit("bench_done", payload)
             if payload.get("hardware"):
-                emit_status(f"Benchmark complete ({label}) — hardware: {payload['hardware']}.", "ok")
+                emit_status(
+                    f"Benchmark complete ({label}) — hardware: {payload['hardware']}.", "ok"
+                )
             else:
                 emit_status(f"Benchmark complete ({label}) — metrics and chart below.", "ok")
         except Exception as exc:
