@@ -122,7 +122,7 @@ if __name__ == "__main__":
     ssl_ctx = _get_ssl_context()
     scheme = "https" if ssl_ctx else "http"
     threading.Timer(1.2, lambda: webbrowser.open(f"{scheme}://localhost:{PORT}")).start()
-    print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")
+    print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")  # noqa: T201 \u2014 startup banner
     socketio.run(
         app, host=HOST, port=PORT, debug=False, ssl_context=ssl_ctx,
         allow_unsafe_werkzeug=True,

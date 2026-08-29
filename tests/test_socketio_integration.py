@@ -5,14 +5,9 @@ Socket.IO emits status/cl_done/qu_done/bench_done events back to the client.
 
 Requires Python 3.10+ (nonogram source uses PEP 604 union types).
 """
-import sys
 import time
 
 import pytest
-
-if sys.version_info < (3, 10):
-    pytest.skip("nonogram requires Python 3.10+ (PEP 604 type unions)", allow_module_level=True)
-
 from flask import Flask
 from flask_socketio import SocketIO
 

@@ -27,7 +27,7 @@ def _assert_quantum_finds_classical(puzzle):
     # Check that at least one classical solution appears among the top results.
     # For small puzzles (1-2 qubits), Grover gives near-uniform probabilities,
     # so we use a lenient threshold relative to the uniform baseline.
-    n_qubits = len(list(counts.keys())[0])
+    n_qubits = len(next(iter(counts)))
     uniform_prob = 1.0 / (2 ** n_qubits)
     # Require above uniform probability (solution should be at least slightly amplified)
     threshold = uniform_prob * 0.5

@@ -44,7 +44,7 @@ from typing import Any
 
 from nonogram.errors import PuzzleIOError, ValidationError
 
-__all__ = ["save_puzzle", "load_puzzle", "save_batch", "load_batch"]
+__all__ = ["load_batch", "load_puzzle", "save_batch", "save_puzzle"]
 
 _MAX_LINE = 10  # matches config.py MAX_GRID and data.py lookup table
 # Hard cap on the solvable grid AREA. Both solvers are exponential in rows*cols:
@@ -173,8 +173,7 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
     # Normalise older/hand-written files that may omit optional keys
     # Strip both suffixes for .non.json files (path.stem only removes one)
     stem = path.stem
-    if stem.endswith(".non"):
-        stem = stem[:-4]
+    stem = stem.removesuffix(".non")
     data.setdefault("name", stem)
     data.setdefault("tags", [])
     data.setdefault("created", "")
