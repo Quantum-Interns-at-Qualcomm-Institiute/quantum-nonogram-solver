@@ -258,6 +258,19 @@ class TestSolveDoSGuards:
         with state_lock:
             state["busy"] = False
 
+    def test_benchmark_clamps_excessive_trials(self, client):
+        # Each trial is a full classical+quantum solve, so a huge trials count is
+        # clamped to MAX_TRIALS (not run verbatim) — one request can't wedge the
+        # single-worker solver for minutes on end.
+        from tools.config import MAX_TRIALS
+
+        resp = client.post(
+            "/api/benchmark/sync",
+            json={"row_clues": [[1], [1]], "col_clues": [[1], [1]], "trials": MAX_TRIALS + 50},
+        )
+        assert resp.status_code == 200
+        assert len(resp.get_json()["cl_times"]) == MAX_TRIALS
+
 
 # ---------------------------------------------------------------------------
 # Hardware routes
@@ -265,9 +278,12 @@ class TestSolveDoSGuards:
 
 
 class TestHardwareRoutes:
-    def test_hw_config_connect_disconnect(self, client):
+    def test_hw_config_connect_disconnect(self, client, monkeypatch):
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
         cfg = {
-            "token": "fake-token",
+            # SECURITY: a client-supplied token must be ignored — the credentials that
+            # spend real quantum credits come from the server environment only.
+            "token": "attacker-supplied",
             "channel": "ibm_quantum_platform",
             "backend_name": "ibm_test",
             "shots": 512,
@@ -279,6 +295,7 @@ class TestHardwareRoutes:
 
         assert state["hw_config"] is not None
         assert state["hw_config"]["backend_name"] == "ibm_test"
+        assert state["hw_config"]["token"] == "server-held-token"  # never the caller's
 
         # Disconnect
         resp = client.post("/api/hw/config", json={"disconnect": True})
@@ -289,18 +306,22 @@ class TestHardwareRoutes:
         resp = client.post("/api/hw/config", json={"disconnect": True})
         assert resp.status_code == 200
 
-    def test_hw_backends_missing_runtime(self, client):
-        """Backends endpoint returns 400 when qiskit-ibm-runtime errors."""
-        resp = client.post(
-            "/api/hw/backends",
-            json={
-                "token": "bad-token",
-                "channel": "ibm_quantum_platform",
-            },
-        )
+    def test_hw_backends_missing_runtime(self, client, monkeypatch):
+        """With server credentials present, a bad token surfaces as 400 from the runtime."""
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "bad-token")
+        resp = client.post("/api/hw/backends", json={"channel": "ibm_quantum_platform"})
         # Should return 400 with an error message (auth will fail)
         assert resp.status_code == 400
         assert "error" in resp.get_json()
+
+    def test_hardware_routes_are_503_without_server_credentials(self, client, monkeypatch):
+        """No server-held token ⇒ hardware is unavailable. A caller cannot supply one:
+        that would let a stranger spend the owner's quantum credits (or make this
+        server relay their token)."""
+        monkeypatch.delenv("IBM_QUANTUM_TOKEN", raising=False)
+        attacker = {"token": "attacker-supplied", "backend_name": "ibm_test"}
+        assert client.post("/api/hw/config", json=attacker).status_code == 503
+        assert client.post("/api/hw/backends", json=attacker).status_code == 503
 
 
 # ---------------------------------------------------------------------------

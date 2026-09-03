@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 
 from tools.chart import render_chart_b64, report_to_dict
-from tools.config import RUNS_DIR
+from tools.config import MAX_TRIALS, RUNS_DIR
 from tools.errors import respond_error
 from tools.state import emit_status, set_busy, state, state_lock
 
@@ -344,7 +344,7 @@ def api_benchmark():
         if state["busy"]:
             return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
-    trials = max(1, int(data.get("trials", 1)))
+    trials = min(MAX_TRIALS, max(1, int(data.get("trials", 1))))
     with state_lock:
         hw_cfg = state.get("hw_config")
     label = f"{trials} trial{'s' if trials > 1 else ''}"
@@ -425,7 +425,7 @@ def api_benchmark_sync():
         row_clues, col_clues, rows, cols, err = _parse_validated_clues()
         if err is not None:
             return err
-        trials = max(1, int((request.json or {}).get("trials", 1)))
+        trials = min(MAX_TRIALS, max(1, int((request.json or {}).get("trials", 1))))
         with state_lock:
             hw_cfg = state.get("hw_config")
         payload = _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg)
