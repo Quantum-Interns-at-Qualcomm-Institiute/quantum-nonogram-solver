@@ -188,9 +188,10 @@ class TestBenchmarkAPIContract:
 class TestHardwareAPIContract:
     """POST /api/hw/config and /api/hw/backends."""
 
-    def test_connect_response(self, client):
+    def test_connect_response(self, client, monkeypatch):
+        # Credentials are server-held (env), not part of the request body.
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
         cfg = {
-            "token": "test-token",
             "channel": "ibm_quantum_platform",
             "backend_name": "ibm_test",
             "shots": 1024,
