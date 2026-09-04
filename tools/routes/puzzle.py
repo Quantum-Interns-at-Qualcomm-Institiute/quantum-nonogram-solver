@@ -24,10 +24,16 @@ def api_puzzle_load():
 
     from nonogram.io import load_puzzle
 
+    from nonogram.errors import PuzzleIOError, ValidationError
+
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         f.save(tmp.name)
         try:
+            # load_puzzle validates clue shape, values, and the per-line size cap
+            # BEFORE we allocate the grid below. A bad upload is a 400, not a 500.
             data = load_puzzle(tmp.name)
+        except (ValidationError, PuzzleIOError, ValueError, KeyError) as exc:
+            return respond_error("invalid_puzzle", str(exc)[:500], 400)
         finally:
             Path(tmp.name).unlink()
     row_clues = [list(r) for r in data["row_clues"]]
@@ -54,9 +60,24 @@ def api_puzzle_save():
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
-    row_clues = [tuple(c) for c in data["row_clues"]]
-    col_clues = [tuple(c) for c in data["col_clues"]]
-    name = data.get("name", state["puzzle_name"]) or "puzzle"
+    try:
+        row_clues = [tuple(c) for c in data["row_clues"]]
+        col_clues = [tuple(c) for c in data["col_clues"]]
+    except (KeyError, TypeError):
+        return respond_error(
+            "invalid_clues", "body must carry 'row_clues' and 'col_clues' as lists", 400
+        )
+    from nonogram.errors import ValidationError
+    from nonogram.io import _slugify, _validate_clues
+
+    try:
+        _validate_clues(row_clues, col_clues)
+    except ValidationError as exc:
+        return respond_error("invalid_clues", str(exc)[:500], 400)
+    # The display name stays as given (bounded); only the filename is slugified,
+    # since it lands in a Content-Disposition header.
+    name = (data.get("name", state["puzzle_name"]) or "puzzle")[:100]
+    safe_name = _slugify(name)
     buf = io.BytesIO()
     payload = {
         "name": name,
@@ -68,5 +89,5 @@ def api_puzzle_save():
     buf.write(json.dumps(payload, indent=2).encode())
     buf.seek(0)
     return send_file(
-        buf, mimetype="application/json", as_attachment=True, download_name=f"{name}.non.json"
+        buf, mimetype="application/json", as_attachment=True, download_name=f"{safe_name}.non.json"
     )

@@ -54,7 +54,11 @@ def api_hw_backends():
             {"backends": [{"name": b[0], "qubits": b[1], "pending": b[2]} for b in backends]}
         )
     except Exception as exc:
-        return respond_error("hardware_error", str(exc), 400)
+        from tools.routes.solver import _sanitize_error
+
+        # Runtime client errors can echo request internals or credentials —
+        # sanitize before they reach a browser.
+        return respond_error("hardware_error", _sanitize_error(exc), 400)
 
 
 @bp.route("/api/hw/config", methods=["POST"])

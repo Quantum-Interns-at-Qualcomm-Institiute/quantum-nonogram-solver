@@ -358,7 +358,9 @@ class TestDockerContainerHealth:
 
     def test_entrypoint_runs_webapp(self):
         src = _read(ROOT / "Dockerfile")
-        assert "webapp.py" in src, "Container must start the webapp"
+        # gunicorn entrypoint (tools.webapp:app) or a direct run both count.
+        assert "webapp.py" in src or "tools.webapp:app" in src, "Container must start the webapp"
+        assert "gunicorn" in src, "Container must use a production WSGI server, not Werkzeug"
 
     def test_dockerfile_installs_system_deps(self):
         src = _read(ROOT / "Dockerfile")

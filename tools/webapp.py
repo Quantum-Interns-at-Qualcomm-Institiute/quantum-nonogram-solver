@@ -22,7 +22,11 @@ Flask + Socket.IO web interface for interactive nonogram solving.
 
   - **Frontend**: HTML5 canvas grid, responsive UI, Socket.IO client
   - **Backend**: Flask server, threaded solver workers, real-time metric updates
-  - **State**: Single-user local state managed with thread safety
+  - **State**: Single-OPERATOR state managed with thread safety — the grid,
+    busy flag, and hardware toggle are one shared set per process, guarded
+    upstream by the front-door origin secret. Solver results/status are
+    scoped to the requesting client's Socket.IO sid when the request carries
+    one; concurrent operators are not a supported mode.
   - **Modules**:
     - ``tools/state.py``   — server state and Socket.IO helpers
     - ``tools/chart.py``   — chart rendering and report serialization
