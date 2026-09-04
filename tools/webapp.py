@@ -39,7 +39,9 @@ Flask + Socket.IO web interface for interactive nonogram solving.
 
 from __future__ import annotations
 
+import hmac
 import os
+import re
 import sys
 import threading
 import webbrowser
@@ -50,7 +52,7 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT))
 
-from flask import Flask  # noqa: E402
+from flask import Flask, jsonify, request  # noqa: E402
 from flask_cors import CORS  # noqa: E402
 from flask_socketio import SocketIO  # noqa: E402
 
@@ -65,12 +67,67 @@ app = Flask(__name__)
 # oversized payloads with a 413 before Flask parses them.
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 app.secret_key = os.environ.get("NONOGRAM_SECRET_KEY", os.urandom(32).hex())
-CORS(app, origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*,https://andypeterson.dev").split(","))
+
+# NOTE the anchored regex: flask-cors treats any entry containing "*" as a
+# start-anchored-only regex, so the old "http://localhost:*" allowed the
+# registrable origin http://localhostevil.com. The ^...$ form does not.
+_CORS_ORIGINS = os.environ.get(
+    "NONOGRAM_CORS_ORIGINS",
+    r"^https?://localhost(:\d+)?$,https://andypeterson.dev",
+).split(",")
+CORS(app, origins=_CORS_ORIGINS)
+
+
+def _socketio_origin_ok(origin: str) -> bool:
+    """Match Socket.IO origins with the same anchored semantics as flask-cors.
+
+    python-socketio exact-matches plain strings (so the old wildcard entry
+    silently allowed nothing); a callable applies the regex entries properly.
+    """
+    for entry in _CORS_ORIGINS:
+        if any(ch in entry for ch in "^$*?[]"):
+            if re.fullmatch(entry.lstrip("^").rstrip("$"), origin):
+                return True
+        elif origin == entry:
+            return True
+    return False
+
+
 socketio = SocketIO(
     app,
     async_mode="threading",
-    cors_allowed_origins=os.environ.get("NONOGRAM_CORS_ORIGINS", "http://localhost:*,https://andypeterson.dev").split(","),
+    cors_allowed_origins=_socketio_origin_ok,
 )
+
+
+# ── Front-door guard (fail closed) ───────────────────────────────────────────
+# Every route except /health requires the X-Origin-Secret the gateway injects
+# (andypeterson-gateway sets LIVE_ORIGIN_SECRET for this backend). Unlike the
+# classifier service's opt-in guard, this one FAILS CLOSED: with ORIGIN_SECRET
+# unset the API refuses to serve, unless NONOGRAM_ALLOW_INSECURE=1 explicitly
+# opts into unguarded local dev. Without this, the hardware routes let any
+# caller spend real IBM Quantum credits on the owner's account.
+@app.before_request
+def _origin_guard():
+    if request.path == "/health":
+        return None
+    want = os.environ.get("ORIGIN_SECRET")
+    if not want:
+        if os.environ.get("NONOGRAM_ALLOW_INSECURE") == "1":
+            return None
+        return jsonify(
+            {
+                "error": {
+                    "code": "origin_guard_unconfigured",
+                    "message": "set ORIGIN_SECRET (or NONOGRAM_ALLOW_INSECURE=1 for local dev)",
+                }
+            }
+        ), 403
+    got = request.headers.get("X-Origin-Secret") or ""
+    # compare_digest: a plain != on a secret leaks timing.
+    if not hmac.compare_digest(got, want):
+        return jsonify({"error": {"code": "forbidden", "message": "origin"}}), 403
+    return None
 
 # Bind SocketIO to state module so helpers can emit
 app_state.init(socketio)
