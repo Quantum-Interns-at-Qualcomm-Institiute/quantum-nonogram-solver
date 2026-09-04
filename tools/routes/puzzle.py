@@ -22,9 +22,8 @@ def api_puzzle_load():
     import tempfile
     from pathlib import Path
 
-    from nonogram.io import load_puzzle
-
     from nonogram.errors import PuzzleIOError, ValidationError
+    from nonogram.io import load_puzzle
 
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         f.save(tmp.name)
