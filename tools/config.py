@@ -11,6 +11,12 @@ MAX_GRID = 10
 # is rejected with 413 before parsing (DoS guard). Shared by webapp.py and tests.
 MAX_CONTENT_LENGTH = 256 * 1024  # 256 KB
 
+# Max benchmark trials per request. Each trial is a full classical+quantum solve,
+# so an unbounded count multiplies compute and can wedge the single-worker solver
+# even on a size-capped grid. The UI offers up to 20; 25 leaves headroom. Requests
+# above this are clamped (extra trials add sampling noise, not new information).
+MAX_TRIALS = 25
+
 PUZZLES_DIR = ROOT / "puzzles"
 PUZZLES_DIR.mkdir(parents=True, exist_ok=True)
 

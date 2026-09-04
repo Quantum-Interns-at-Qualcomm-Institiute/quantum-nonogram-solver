@@ -29,10 +29,15 @@ def init(sio: SocketIO) -> None:
     socketio = sio
 
 
-def emit_status(msg: str, level: str = "info") -> None:
-    """Broadcast a status message to all connected clients."""
+def emit_status(msg: str, level: str = "info", to: str | None = None) -> None:
+    """Emit a status message — to one client's sid when given, else broadcast.
+
+    Result/status emits are scoped to the requesting client when the request
+    carries its Socket.IO sid; the busy flag stays broadcast because the busy
+    state genuinely is global (single solver, single-operator app).
+    """
     if socketio is not None:
-        socketio.emit("status", {"msg": msg, "level": level})
+        socketio.emit("status", {"msg": msg, "level": level}, to=to)
 
 
 def set_busy(busy: bool) -> None:
