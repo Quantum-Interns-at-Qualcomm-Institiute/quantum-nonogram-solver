@@ -31,7 +31,7 @@ class TestParseCluesShape:
             _parse_clues(body)
 
     def test_good_shape_parses(self):
-        rc, cc, rows, cols = _parse_clues({"row_clues": [[1], [2]], "col_clues": [[1], [1], [1]]})
+        rc, _cc, rows, cols = _parse_clues({"row_clues": [[1], [2]], "col_clues": [[1], [1], [1]]})
         assert (rows, cols) == (2, 3)
         assert rc == [(1,), (2,)]
 
