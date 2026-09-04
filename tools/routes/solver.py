@@ -14,6 +14,7 @@ Both forms share the same compute helpers and honour the single-solver busy lock
 from __future__ import annotations
 
 import json
+import os
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -21,7 +22,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 
 from tools.chart import render_chart_b64, report_to_dict
-from tools.config import RUNS_DIR
+from tools.config import MAX_TRIALS, RUNS_DIR
 from tools.errors import respond_error
 from tools.state import emit_status, set_busy, state, state_lock
 
@@ -40,8 +41,16 @@ def _sanitize_error(exc: Exception) -> str:
 
 
 def _save_run(payload: dict) -> None:
-    """Persist run payload as JSON to RUNS_DIR; errors are non-fatal."""
+    """Persist run payload as JSON to RUNS_DIR; errors are non-fatal.
+
+    The store is capped (NONOGRAM_MAX_RUNS, default 50): oldest run files are
+    pruned first, so repeated benchmarks can never fill the volume.
+    """
     try:
+        max_runs = int(os.environ.get("NONOGRAM_MAX_RUNS", "50"))
+        existing = sorted(RUNS_DIR.glob("run_*.json"), key=lambda p: p.stat().st_mtime)
+        for stale in existing[: max(0, len(existing) - (max_runs - 1))]:
+            stale.unlink(missing_ok=True)
         run_file = RUNS_DIR / f"run_{payload['run_id']}.json"
         with run_file.open("w") as fh:
             json.dump(payload, fh, indent=2)
@@ -88,16 +97,54 @@ def _build_payload(
 
 
 def _parse_clues(data: dict) -> tuple[list, list, int, int]:
-    """Extract and convert clues from request JSON."""
-    row_clues = [tuple(c) for c in data["row_clues"]]
-    col_clues = [tuple(c) for c in data["col_clues"]]
+    """Extract and convert clues from request JSON.
+
+    Raises ValueError on a malformed body shape (missing keys, non-list
+    entries) so routes can 400 instead of 500ing on a KeyError/TypeError.
+    """
+    try:
+        row_clues = [tuple(c) for c in data["row_clues"]]
+        col_clues = [tuple(c) for c in data["col_clues"]]
+    except (KeyError, TypeError) as exc:
+        msg = "body must carry 'row_clues' and 'col_clues' as lists of clue lists"
+        raise ValueError(msg) from exc
     return row_clues, col_clues, len(row_clues), len(col_clues)
 
 
-def _get_quantum_solver():
-    """Build the appropriate quantum Solver from hw_config state."""
+def _request_hw_cfg(data: dict) -> dict | None:
+    """Per-request hardware config (preferred over the global toggle).
+
+    The request may carry {"hw": {"backend_name": ..., "shots": ...}} — the
+    token always comes from the server environment and shots are capped, so a
+    caller chooses parameters but never credentials or unbounded spend. Falls
+    back to the global hw_config state for the existing UI flow.
+    """
+    from tools.routes.hardware import MAX_SHOTS, _ibm_channel, _ibm_token
+
+    hw_req = data.get("hw") if isinstance(data, dict) else None
+    if isinstance(hw_req, dict) and hw_req.get("backend_name"):
+        token = _ibm_token()
+        if not token:
+            return None
+        try:
+            shots = int(hw_req.get("shots", 1024))
+        except (TypeError, ValueError):
+            shots = 1024
+        return {
+            "token": token,
+            "channel": _ibm_channel(hw_req),
+            "backend_name": str(hw_req["backend_name"]),
+            "shots": min(MAX_SHOTS, max(1, shots)),
+        }
     with state_lock:
-        hw_cfg = state.get("hw_config")
+        return state.get("hw_config")
+
+
+def _get_quantum_solver(hw_cfg=None):
+    """Build the appropriate quantum Solver (per-request config, else global)."""
+    if hw_cfg is None:
+        with state_lock:
+            hw_cfg = state.get("hw_config")
     if hw_cfg:
         from nonogram.solver import QuantumHardwareSolver
 
@@ -234,7 +281,10 @@ def api_solve_classical():
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
-    row_clues, col_clues, rows, cols = _parse_clues(data)
+    try:
+        row_clues, col_clues, rows, cols = _parse_clues(data)
+    except ValueError as e:
+        return respond_error("invalid_clues", str(e), 400)
 
     from nonogram.io import _MAX_CELLS, _validate_clues
     try:
@@ -247,10 +297,13 @@ def api_solve_classical():
             return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
 
+    # Scope result emits to the requesting client when it tells us its sid.
+    to = data.get("sid") or None
+
     from nonogram.solver import ClassicalSolver
 
     solver = ClassicalSolver()
-    emit_status(f"{solver.name} solver running…", "warn")
+    emit_status(f"{solver.name} solver running…", "warn", to=to)
 
     def _work():
         try:
@@ -258,13 +311,13 @@ def api_solve_classical():
 
             result = solver.solve((row_clues, col_clues))
             solutions = result["solutions"]
-            socketio.emit("cl_done", {"solutions": solutions, "rows": rows, "cols": cols})
-            emit_status(f"{solver.name}: {len(solutions)} solution(s) found.", "ok")
+            socketio.emit("cl_done", {"solutions": solutions, "rows": rows, "cols": cols}, to=to)
+            emit_status(f"{solver.name}: {len(solutions)} solution(s) found.", "ok", to=to)
         except Exception as exc:
             from tools.state import socketio
 
-            socketio.emit("solver_error", {"message": _sanitize_error(exc)})
-            emit_status(f"{solver.name} error: {_sanitize_error(exc)}", "err")
+            socketio.emit("solver_error", {"message": _sanitize_error(exc)}, to=to)
+            emit_status(f"{solver.name} error: {_sanitize_error(exc)}", "err", to=to)
         finally:
             set_busy(False)
 
@@ -280,7 +333,10 @@ def api_solve_quantum():
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
-    row_clues, col_clues, rows, cols = _parse_clues(data)
+    try:
+        row_clues, col_clues, rows, cols = _parse_clues(data)
+    except ValueError as e:
+        return respond_error("invalid_clues", str(e), 400)
 
     from nonogram.io import _MAX_CELLS, _validate_clues
     try:
@@ -293,8 +349,9 @@ def api_solve_quantum():
             return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
 
-    solver = _get_quantum_solver()
-    emit_status(f"{solver.name} running…", "warn")
+    to = data.get("sid") or None
+    solver = _get_quantum_solver(_request_hw_cfg(data))
+    emit_status(f"{solver.name} running…", "warn", to=to)
 
     def _work():
         try:
@@ -302,21 +359,23 @@ def api_solve_quantum():
 
             result = solver.solve((row_clues, col_clues))
             counts = result["counts"]
-            socketio.emit("qu_done", {"counts": counts, "rows": rows, "cols": cols})
+            socketio.emit("qu_done", {"counts": counts, "rows": rows, "cols": cols}, to=to)
             if "backend_name" in result:
-                emit_status(f"{solver.name} complete.", "ok")
+                emit_status(f"{solver.name} complete.", "ok", to=to)
             else:
                 n_above = sum(
                     1 for p in counts.values() if p >= max(3.0 / (2 ** (rows * cols)), 0.005)
                 )
                 emit_status(
-                    f"Quantum: simulation complete. {n_above} above-threshold outcome(s).", "ok"
+                    f"Quantum: simulation complete. {n_above} above-threshold outcome(s).",
+                    "ok",
+                    to=to,
                 )
         except Exception as exc:
             from tools.state import socketio
 
-            socketio.emit("solver_error", {"message": _sanitize_error(exc)})
-            emit_status(f"Quantum error: {_sanitize_error(exc)}", "err")
+            socketio.emit("solver_error", {"message": _sanitize_error(exc)}, to=to)
+            emit_status(f"Quantum error: {_sanitize_error(exc)}", "err", to=to)
         finally:
             set_busy(False)
 
@@ -332,7 +391,10 @@ def api_benchmark():
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
-    row_clues, col_clues, rows, cols = _parse_clues(data)
+    try:
+        row_clues, col_clues, rows, cols = _parse_clues(data)
+    except ValueError as e:
+        return respond_error("invalid_clues", str(e), 400)
 
     from nonogram.io import _MAX_CELLS, _validate_clues
     try:
@@ -344,29 +406,29 @@ def api_benchmark():
         if state["busy"]:
             return respond_error("solver_busy", "Solver busy", 409)
         state["busy"] = True
-    trials = max(1, int(data.get("trials", 1)))
-    with state_lock:
-        hw_cfg = state.get("hw_config")
+    trials = min(MAX_TRIALS, max(1, int(data.get("trials", 1))))
+    to = data.get("sid") or None
+    hw_cfg = _request_hw_cfg(data)
     label = f"{trials} trial{'s' if trials > 1 else ''}"
-    emit_status(f"Benchmarking both solvers ({label}) — please wait…", "warn")
+    emit_status(f"Benchmarking both solvers ({label}) — please wait…", "warn", to=to)
 
     def _work():
         try:
             from tools.state import socketio
 
             payload = _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg)
-            socketio.emit("bench_done", payload)
+            socketio.emit("bench_done", payload, to=to)
             if payload.get("hardware"):
                 emit_status(
-                    f"Benchmark complete ({label}) — hardware: {payload['hardware']}.", "ok"
+                    f"Benchmark complete ({label}) — hardware: {payload['hardware']}.", "ok", to=to
                 )
             else:
-                emit_status(f"Benchmark complete ({label}) — metrics and chart below.", "ok")
+                emit_status(f"Benchmark complete ({label}) — metrics and chart below.", "ok", to=to)
         except Exception as exc:
             from tools.state import socketio
 
-            socketio.emit("solver_error", {"message": _sanitize_error(exc)})
-            emit_status(f"Benchmark error: {_sanitize_error(exc)}", "err")
+            socketio.emit("solver_error", {"message": _sanitize_error(exc)}, to=to)
+            emit_status(f"Benchmark error: {_sanitize_error(exc)}", "err", to=to)
         finally:
             set_busy(False)
 
@@ -425,7 +487,7 @@ def api_benchmark_sync():
         row_clues, col_clues, rows, cols, err = _parse_validated_clues()
         if err is not None:
             return err
-        trials = max(1, int((request.json or {}).get("trials", 1)))
+        trials = min(MAX_TRIALS, max(1, int((request.json or {}).get("trials", 1))))
         with state_lock:
             hw_cfg = state.get("hw_config")
         payload = _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg)

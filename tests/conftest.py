@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# The webapp's front-door guard fails closed (ORIGIN_SECRET required). The
+# suite runs against ad-hoc test apps for the most part, but anything touching
+# tools.webapp's real app object opts into unguarded local mode explicitly —
+# the guard itself is covered by tests/test_origin_guard.py, which sets
+# ORIGIN_SECRET and overrides this.
+os.environ.setdefault("NONOGRAM_ALLOW_INSECURE", "1")
 
 # Ensure the project root is importable regardless of how pytest is invoked.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

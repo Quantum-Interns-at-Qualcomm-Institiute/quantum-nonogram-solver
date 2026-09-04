@@ -20,4 +20,9 @@ RUN mkdir -p .certs && \
 
 ENV DEV_CERT_DIR=/app/.certs
 
-CMD ["python", "tools/webapp.py"]
+# Production WSGI server (gunicorn) instead of the Werkzeug dev server. ONE
+# gthread worker: server state (grid/busy/hw_config) is per-process, and
+# Flask-SocketIO's threading mode under gunicorn serves Socket.IO via
+# long-polling (no WebSocket) — the client falls back transparently. TLS is
+# the platform edge's job here (the dev certs remain for direct local runs).
+CMD ["sh", "-c", "exec gunicorn --worker-class gthread --workers 1 --threads 16 --timeout 120 --bind 0.0.0.0:${PORT:-8080} tools.webapp:app"]
