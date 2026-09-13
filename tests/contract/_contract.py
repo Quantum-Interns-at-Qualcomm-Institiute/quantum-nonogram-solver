@@ -66,17 +66,17 @@ def skip_unless_reachable(base: str, env_var: str):
     )
 
 
-def http_get(base: str, path: str, timeout: int = 15):
-    return _request("GET", base + path, None, timeout)
+def http_get(base: str, path: str, timeout: int = 15, headers: dict | None = None):
+    return _request("GET", base + path, None, timeout, headers)
 
 
-def http_post(base: str, path: str, body=None, timeout: int = 60):
-    return _request("POST", base + path, body, timeout)
+def http_post(base: str, path: str, body=None, timeout: int = 60, headers: dict | None = None):
+    return _request("POST", base + path, body, timeout, headers)
 
 
-def _request(method: str, url: str, body, timeout: int):
+def _request(method: str, url: str, body, timeout: int, headers: dict | None = None):
     data = None
-    headers = {}
+    headers = dict(headers or {})
     if body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
