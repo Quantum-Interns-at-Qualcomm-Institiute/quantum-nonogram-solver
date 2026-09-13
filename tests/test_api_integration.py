@@ -60,11 +60,7 @@ def sio_client():
 SIMPLE_ROW_CLUES = [[2], [2]]
 SIMPLE_COL_CLUES = [[2], [2]]
 
-# A valid 3x3 puzzle with a unique solution
-# Grid:  [[True, False, True],
-#          [False, True, False],
-#          [True, False, True]]
-# Row clues: [1,1], [1], [1,1]   Col clues: [1,1], [1], [1,1]
+# A 3x3 puzzle with a unique solution: the X pattern ■□■ / □■□ / ■□■.
 SMALL_ROW_CLUES = [[1, 1], [1], [1, 1]]
 SMALL_COL_CLUES = [[1, 1], [1], [1, 1]]
 
@@ -375,10 +371,8 @@ class TestRunsInfoDeleteCycle:
 
     def test_full_cycle_benchmark_creates_run_then_delete(self, http_client):
         """Run a benchmark (creates a run file) then delete and verify."""
-        # Start from a clean slate: the autouse reset clears in-memory state but
-        # not the runs directory, so without this the test could pass on run
-        # files left by earlier tests (and fail in isolation). Delete first so
-        # the count assertion below reflects only this test's own benchmark.
+        # The autouse reset leaves the runs directory, so clear it: the count below
+        # must reflect only this test's benchmark.
         http_client.post("/api/runs/delete")
 
         http_client.post("/api/benchmark", json={
@@ -387,9 +381,8 @@ class TestRunsInfoDeleteCycle:
             "trials": 1,
         })
 
-        # The benchmark solves in a background thread and then writes the run
-        # file, so poll for it rather than assuming a fixed duration — a cold
-        # solve can take longer than any single sleep would reliably cover.
+        # The run file is written from a background thread after the solve: poll,
+        # since a cold solve outlasts any fixed sleep.
         deadline = time.monotonic() + 30
         info_before = {"count": 0}
         while time.monotonic() < deadline:

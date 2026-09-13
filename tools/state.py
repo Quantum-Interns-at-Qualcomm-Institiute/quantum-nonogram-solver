@@ -19,7 +19,7 @@ state: dict[str, Any] = {
 }
 state_lock = threading.Lock()
 
-# Populated by webapp.py after SocketIO is created
+# Set once the SocketIO server exists.
 socketio: SocketIO | None = None
 
 

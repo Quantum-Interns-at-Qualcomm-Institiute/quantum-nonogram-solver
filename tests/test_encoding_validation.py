@@ -113,11 +113,7 @@ class TestThreeByThree:
         row_clues = [(1,), (1,), (1,)]
         col_clues = [(1,), (1,), (1,)]
         expr = puzzle_to_boolean(row_clues, col_clues)
-        # Groups are separated by & at the top level. Each group is wrapped
-        # in parentheses. Count the outermost groups by splitting on ')&(' or
-        # by counting top-level '&' operators.
-        # The expression structure is: (group1)&(group2)&...&(groupN)
-        # A reliable way: count top-level & separators.
+        # The expression is (group1)&(group2)&...&(groupN): count top-level '&'.
         n = len(row_clues)
         d = len(col_clues)
         expected_groups = n + d
@@ -336,9 +332,7 @@ class TestMultiBlockClues:
         row_clues = [(1, 1)]
         col_clues = [(1,), (0,), (1,), (0,)]
         expr = puzzle_to_boolean(row_clues, col_clues)
-        # Valid row patterns for (1,1) on 4 cells: 1010, 0101, 1001
-        # But column constraints also restrict: col0=(1,), col1=(0,), col2=(1,), col3=(0,)
-        # Only 1010 satisfies all column constraints.
+        # (1,1) on 4 cells allows 1010, 0101 and 1001; the column clues leave only 1010.
         assert _eval_boolean_expr(expr, _bitstring_to_assignment("1010"))
 
     def test_multi_block_classical_clause_structure(self):
@@ -383,9 +377,7 @@ class TestKnownSolutionEvaluation:
 
     def test_3x3_unique_solution(self):
         """A 3x3 puzzle with a unique solution."""
-        # Grid:  1 0 1
-        #        0 1 0
-        #        1 0 1
+        # Grid: 101 / 010 / 101
         row_clues = [(1, 1), (1,), (1, 1)]
         col_clues = [(1, 1), (1,), (1, 1)]
         expr = puzzle_to_boolean(row_clues, col_clues)

@@ -46,14 +46,10 @@ from nonogram.errors import PuzzleIOError, ValidationError
 
 __all__ = ["load_batch", "load_puzzle", "save_batch", "save_puzzle"]
 
-_MAX_LINE = 10  # matches config.py MAX_GRID and data.py lookup table
-# Hard cap on the solvable grid AREA. Both solvers are exponential in rows*cols:
-# the quantum simulator allocates a 2**(rows*cols) statevector and the classical
-# solver brute-forces 2**(rows*cols) candidates, so the per-line cap above is not
-# enough on its own — a 10×10 puzzle is 2**100. 20 cells (e.g. 4×5) is ~2**20,
-# which stays fast and small. The web solve/benchmark routes pass this to
-# _validate_clues as max_cells; library save/load omits it (storing a puzzle does
-# no compute), so serialization of larger grids is unaffected.
+_MAX_LINE = 10  # the largest grid side the lookup tables cover
+
+# Both solvers are exponential in rows*cols (a 2**cells statevector; 2**cells
+# classical candidates), so solving caps the area: 20 cells is ~2**20.
 _MAX_CELLS = 20
 
 
@@ -170,8 +166,7 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
         raise PuzzleIOError(f"Puzzle file not found: {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
 
-    # Normalise older/hand-written files that may omit optional keys
-    # Strip both suffixes for .non.json files (path.stem only removes one)
+    # Hand-written puzzles may omit optional keys; path.stem drops only one suffix.
     stem = path.stem
     stem = stem.removesuffix(".non")
     data.setdefault("name", stem)
