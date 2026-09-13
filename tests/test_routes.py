@@ -40,7 +40,7 @@ def app():
     )
     test_app.config["TESTING"] = True
     test_app.config["SECRET_KEY"] = "test"
-    # Mirror the production body-size guard (see tools/webapp.py).
+    # Mirror the production body-size guard.
     from tools.config import MAX_CONTENT_LENGTH
 
     test_app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH

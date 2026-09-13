@@ -473,8 +473,7 @@ def _distribution_entropy(counts: dict[str, int | float]) -> float:
 # ---------------------------------------------------------------------------
 
 
-# The benchmark orchestrator runs both solvers end-to-end and assembles one
-# report; it is long but linear, so the statement budget is waived here.
+# Runs both solvers end to end into one report: long, but linear.
 def benchmark(  # noqa: PLR0915
     puzzle: tuple[list, list],
     run_classical: bool = True,

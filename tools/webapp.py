@@ -105,12 +105,9 @@ socketio = SocketIO(
 
 
 # ── Front-door guard (fail closed) ───────────────────────────────────────────
-# Every route except /health requires the X-Origin-Secret the gateway injects
-# (andypeterson-gateway sets LIVE_ORIGIN_SECRET for this backend). Unlike the
-# classifier service's opt-in guard, this one FAILS CLOSED: with ORIGIN_SECRET
-# unset the API refuses to serve, unless NONOGRAM_ALLOW_INSECURE=1 explicitly
-# opts into unguarded local dev. Without this, the hardware routes let any
-# caller spend real IBM Quantum credits on the owner's account.
+# Every route but /health needs the gateway's X-Origin-Secret. With ORIGIN_SECRET
+# unset the API refuses to serve (unless NONOGRAM_ALLOW_INSECURE=1): the hardware
+# routes would otherwise spend real IBM Quantum credits for any caller.
 @app.before_request
 def _origin_guard():
     if request.path == "/health":
