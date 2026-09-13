@@ -7,14 +7,11 @@ ROOT = _HERE.parent
 
 MAX_CLUES = 3
 MAX_GRID = 10
-# Max API request-body size. Clue payloads are a few hundred bytes; anything larger
-# is rejected with 413 before parsing (DoS guard). Shared by webapp.py and tests.
+# Clue payloads are a few hundred bytes; anything larger gets a 413 before parsing.
 MAX_CONTENT_LENGTH = 256 * 1024  # 256 KB
 
-# Max benchmark trials per request. Each trial is a full classical+quantum solve,
-# so an unbounded count multiplies compute and can wedge the single-worker solver
-# even on a size-capped grid. The UI offers up to 20; 25 leaves headroom. Requests
-# above this are clamped (extra trials add sampling noise, not new information).
+# Each trial is a full solve, so this bounds compute; above it requests are clamped
+# (the UI offers 20; more trials add sampling noise, not information).
 MAX_TRIALS = 25
 
 PUZZLES_DIR = ROOT / "puzzles"
