@@ -49,9 +49,12 @@ jobs:
 
       - name: Boot nonogram and run the live-HTTP contract tests
         run: |
+          # The guard runs as in production, with a throwaway secret for this run.
+          export ORIGIN_SECRET="$(python -c 'import secrets; print(secrets.token_hex(16))')"
           PORT=5055 NONOGRAM_HOST=127.0.0.1 python -c "from tools.webapp import app, socketio; socketio.run(app, host='127.0.0.1', port=5055, allow_unsafe_werkzeug=True)" &
           curl --retry 60 --retry-delay 1 --retry-connrefused -sf http://127.0.0.1:5055/health
-          NONOGRAM_URL=http://127.0.0.1:5055 python -m pytest tests/contract/ -v
+          NONOGRAM_URL=http://127.0.0.1:5055 NONOGRAM_ORIGIN_SECRET="$ORIGIN_SECRET" \
+            python -m pytest tests/contract/ -v
 
   docker:
     runs-on: ubuntu-latest
