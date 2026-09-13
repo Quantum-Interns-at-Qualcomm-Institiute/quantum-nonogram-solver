@@ -60,9 +60,7 @@ def quantum_solve(puzzle: tuple[list, list]):
 # ---------------------------------------------------------------------------
 
 
-# The parameters mirror the physical knobs of an IBM hardware run (backend,
-# shots, iterations, error-mitigation toggles); a config object would just
-# rename the same surface.
+# One parameter per hardware-run knob; a config object would only rename them.
 def quantum_solve_hardware(  # noqa: PLR0913
     puzzle: tuple[list, list],
     token: str,
@@ -153,9 +151,7 @@ def quantum_solve_hardware(  # noqa: PLR0913
     grover = Grover(iterations=iterations)
     circuit = grover.construct_circuit(problem, measurement=True)
 
-    # ── Transpile for the target backend ────────────────────────────────
-    # optimization_level=3 applies the most aggressive gate-count reduction,
-    # which is important for NISQ hardware where every extra gate adds noise.
+    # Level 3 minimises gate count: on NISQ hardware every extra gate adds noise.
     transpiled = _transpile(circuit, backend=backend, optimization_level=3)
 
     # Record the classical register names *before* submission.  IBM's own docs

@@ -143,7 +143,7 @@ def display_nonogram(bit_string: str, n: int, d: int) -> None:
     print("╚" + "═" * d + "╝")
 
 
-# ── Grid helpers (relocated from tools/_widgets.py) ───────────────────────────
+# ── Grid helpers ─────────────────────────────────────────────────────────────
 
 
 def rle(bits: list[bool]) -> tuple[int, ...]:

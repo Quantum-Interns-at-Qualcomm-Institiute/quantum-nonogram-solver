@@ -91,9 +91,7 @@ def test_2x2_top_row_filled():
 
 def test_3x3_unique_solution():
     """L-shape puzzle: unique solution."""
-    # ■□□
-    # ■□□
-    # ■■■
+    # ■□□ / ■□□ / ■■■
     puzzle = ([(1,), (1,), (3,)], [(3,), (1,), (1,)])
     solutions = classical_solve(puzzle)
     assert len(solutions) == 1
@@ -102,9 +100,7 @@ def test_3x3_unique_solution():
 
 def test_3x3_checkerboard():
     """Checkerboard-like puzzle with alternating clues."""
-    # ■□■
-    # □■□
-    # ■□■
+    # ■□■ / □■□ / ■□■
     puzzle = ([(1, 1), (1,), (1, 1)], [(1, 1), (1,), (1, 1)])
     solutions = classical_solve(puzzle)
     assert len(solutions) == 1
@@ -120,9 +116,7 @@ def test_3x3_all_filled():
 
 def test_3x3_multiple_solutions():
     """Puzzle with multiple valid solutions — verify all satisfy constraints."""
-    # Row clues (1,) (1,) (1,) — one block of 1 in each row
-    # Col clues (1,) (1,) (1,) — one block of 1 in each column
-    # This is a permutation matrix — exactly 6 solutions (3! = 6 not all valid)
+    # One cell per row and column: every 3x3 permutation matrix solves it.
     puzzle = ([(1,), (1,), (1,)], [(1,), (1,), (1,)])
     solutions = classical_solve(puzzle)
     assert len(solutions) >= 2, "Should have multiple solutions"
@@ -144,9 +138,7 @@ def test_2x3_rectangular():
 
 def test_3x2_rectangular():
     """3 rows, 2 columns."""
-    # ■■
-    # □□
-    # ■■
+    # ■■ / □□ / ■■
     puzzle = ([(2,), (0,), (2,)], [(1, 1), (1, 1)])
     solutions = classical_solve(puzzle)
     assert len(solutions) == 1
