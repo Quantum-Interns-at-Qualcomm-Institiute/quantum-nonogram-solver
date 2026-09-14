@@ -25,6 +25,8 @@ the nonogram grid (top-left = bit 0).
 
 from __future__ import annotations
 
+import math
+
 from nonogram.core import puzzle_to_boolean
 from nonogram.errors import HardwareError, QuantumSolverError
 
@@ -53,6 +55,17 @@ def quantum_solve(puzzle: tuple[list, list]):
     return grover.amplify(problem)
 
 
+def grover_success_probability(iterations: int, n_solutions: int, n_states: int) -> float:
+    """Noiseless probability of measuring a solution after ``iterations`` Grover steps.
+
+    P(k) = sin²((2k + 1) · arcsin(√(M / N))) for M solutions among N states
+    (Boyer, Brassard, Høyer & Tapp, "Tight bounds on quantum searching",
+    quant-ph/9605034).
+    """
+    theta = math.asin(math.sqrt(n_solutions / n_states))
+    return math.sin((2 * iterations + 1) * theta) ** 2
+
+
 # Real hardware path (IBM Qiskit Runtime)
 
 
@@ -66,6 +79,7 @@ def quantum_solve_hardware(  # noqa: PLR0913
     iterations: int = 1,
     dynamical_decoupling: bool = True,
     twirling: bool = True,
+    run_info: dict | None = None,
 ) -> tuple[dict[str, int], str]:
     """Solve a nonogram using Grover's algorithm on real IBM quantum hardware.
 
@@ -76,12 +90,13 @@ def quantum_solve_hardware(  # noqa: PLR0913
 
     Grover iteration count guidance
     --------------------------------
-    For a puzzle with exactly 1 solution and an n-qubit search space the
-    noiseless peak probability after k iterations is:
+    For M solutions among N = 2ⁿ states, the noiseless probability of
+    measuring a solution after k iterations is (see
+    ``grover_success_probability``):
 
-        P(k) = sin²((2k + 1) · arcsin(1 / √2ⁿ))
+        P(k) = sin²((2k + 1) · arcsin(√(M / N)))
 
-    A few reference values for n = 9 (3 × 3 grid, 1 solution / 512 states):
+    Reference values for the 3 × 3 all-3s grid (M = 1, N = 512):
 
         k = 1 → P ≈  1.7 %   (barely above random ≈ 0.2 %)
         k = 3 → P ≈  9.3 %   ✓ passes the > 5 % hardware threshold
@@ -111,6 +126,9 @@ def quantum_solve_hardware(  # noqa: PLR0913
         twirling:             Enable Pauli gate + measurement twirling
                               (default True).  Converts coherent errors to
                               depolarising noise, improving result reliability.
+        run_info:             Optional dict, filled in place with the IBM job ID,
+                              backend, shots, iterations and transpiled depth so
+                              a caller can archive the run.
 
     Returns:
         ``(counts_dict, backend_name)`` where *counts_dict* maps bitstring →
@@ -188,6 +206,14 @@ def quantum_solve_hardware(  # noqa: PLR0913
     result = job.result()  # blocks until IBM job is complete
 
     counts = extract_counts(result[0].data, creg_names)
+    if run_info is not None:
+        run_info.update(
+            job_id=job.job_id(),
+            backend=backend.name,
+            shots=shots,
+            iterations=iterations,
+            transpiled_depth=transpiled.depth(),
+        )
     return counts, backend.name
 
 

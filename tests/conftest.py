@@ -140,3 +140,21 @@ def busy_solver():
     yield
     with app_state.state_lock:
         app_state.state["busy"] = False
+
+
+def save_hardware_run(name: str, puzzle: tuple[list, list], counts: dict, run_info: dict) -> Path:
+    """Write a hardware run's counts and job metadata to runs/hardware/, which is gitignored."""
+    import json
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest = Path(__file__).resolve().parent.parent / "runs" / "hardware" / f"{name}-{stamp}.json"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "puzzle": {"row_clues": puzzle[0], "col_clues": puzzle[1]},
+        **run_info,
+        "saved_at": stamp,
+        "counts": counts,
+    }
+    dest.write_text(json.dumps(record, indent=2) + "\n")
+    return dest
