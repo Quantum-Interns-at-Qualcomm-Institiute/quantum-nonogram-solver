@@ -332,14 +332,16 @@ The `PhaseOracleGate` compiles the nonogram constraint through general boolean s
 | 3×3 | 9 | ~2,900 | Noise dominates; pipeline-only test |
 | 4×4+ | 16+ | >10,000 | Beyond current NISQ capabilities |
 
-For hardware demonstrations, **2×2 puzzles** (depth ~142) produce clear quantum results. The 2×2 all-2s puzzle on `ibm_torino` with 1 Grover iteration yielded the correct `"1111"` state at **32.3%** probability (vs. 6.25% random baseline, 47.3% noiseless target).
+For hardware demonstrations, **2×2 puzzles** (depth ~142) produce clear quantum results. The 2×2 all-2s puzzle on `ibm_torino` with 1 Grover iteration yielded the correct `"1111"` state at **32.3%** probability (vs. 6.25% random baseline, 47.3% noiseless target). That figure comes from a single 1,024-shot run whose raw counts and job ID are not archived. The hardware tests now save each run's counts, job ID, backend and circuit depth to `runs/hardware/` (gitignored).
 
-**Grover iteration guidance** — for a single solution in 2^n states, the noiseless peak probability after k iterations is P(k) = sin²((2k+1) · arcsin(1/√2^n)):
+**Grover iteration guidance:** for M solutions among N = 2^n states, the noiseless probability of measuring a solution after k iterations is P(k) = sin²((2k+1) · arcsin(√(M/N))) (Boyer, Brassard, Høyer & Tapp, [quant-ph/9605034](https://arxiv.org/abs/quant-ph/9605034)). `nonogram.quantum.grover_success_probability` computes it. Both puzzles below have exactly one solution (M = 1), which `classical_solve` confirms:
 
-| Grid | k=1 | k=3 | k=5 |
-|------|-----|-----|-----|
-| 2×2 (n=4) | 47.3% | 96.1% | 47.3% |
-| 3×3 (n=9) | 1.8% | 9.3% | 22.6% |
+| Grid | k=1 | k=3 | k=5 | k=9 |
+|------|-----|-----|-----|-----|
+| 2×2 all-2s (N=16) | 47.3% | 96.1% | 12.5% | 99.2% |
+| 3×3 all-3s (N=512) | 1.7% | 9.3% | 21.8% | 55.4% |
+
+P(k) is periodic in k: for the 2×2 grid it peaks near k=3 and falls again by k=5.
 
 ---
 

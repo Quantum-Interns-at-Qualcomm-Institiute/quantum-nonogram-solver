@@ -41,7 +41,7 @@ Run:  pytest tests/test_hardware_3x3.py -v -s
 """
 
 import pytest
-from conftest import load_ibm_token
+from conftest import load_ibm_token, save_hardware_run
 
 
 @pytest.mark.skipif(
@@ -73,6 +73,7 @@ def test_hardware_3x3_pipeline():
     print("This test only verifies the hardware pipeline, not quantum correctness.")
     print("Waiting for IBM queue — this may take several minutes.")
 
+    run_info: dict = {}
     counts, backend_name = quantum_solve_hardware(
         (row_clues, col_clues),
         token=token,
@@ -81,7 +82,10 @@ def test_hardware_3x3_pipeline():
         iterations=1,  # keep circuit as shallow as possible
         dynamical_decoupling=True,
         twirling=True,
+        run_info=run_info,
     )
+    saved = save_hardware_run("3x3-all-threes", (row_clues, col_clues), counts, run_info)
+    print(f"Saved counts and job ID to {saved}")
 
     total = sum(counts.values())
     unique = len(counts)
