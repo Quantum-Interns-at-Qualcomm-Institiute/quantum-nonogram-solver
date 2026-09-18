@@ -1,20 +1,6 @@
-"""Tests for nonogram.solver — Solver ABC and concrete implementations."""
+"""The three solvers keep the shape their callers expect: a name and a solve()."""
 
-import pytest
-
-from nonogram.solver import ClassicalSolver, QuantumSimulatorSolver, Solver
-
-
-class TestSolverABC:
-    def test_solver_is_abstract(self):
-        with pytest.raises(TypeError):
-            Solver()
-
-    def test_classical_solver_is_solver(self):
-        assert isinstance(ClassicalSolver(), Solver)
-
-    def test_quantum_simulator_solver_is_solver(self):
-        assert isinstance(QuantumSimulatorSolver(), Solver)
+from nonogram.solver import ClassicalSolver, QuantumSimulatorSolver
 
 
 class TestClassicalSolverInterface:

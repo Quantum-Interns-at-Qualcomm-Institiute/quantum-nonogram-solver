@@ -86,7 +86,6 @@ from nonogram.solver import (
     ClassicalSolver,
     QuantumHardwareSolver,
     QuantumSimulatorSolver,
-    Solver,
 )
 
 __all__ = [
@@ -102,7 +101,6 @@ __all__ = [
     "QuantumMetrics",
     "QuantumSimulatorSolver",
     "QuantumSolverError",
-    "Solver",
     "SolverError",
     "StaticCircuitAnalysis",
     "ValidationError",

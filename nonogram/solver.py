@@ -1,17 +1,11 @@
-"""Solver interface and concrete implementations.
+"""The three solvers: brute force, Grover on the local simulator, Grover on IBM hardware.
 
-Defines the ``Solver`` abstract base class and two implementations:
-
-  - ``ClassicalSolver`` — brute-force exhaustive search
-  - ``QuantumSimulatorSolver`` — Grover's algorithm on local statevector simulator
-
-The ``benchmark()`` function in ``nonogram.metrics`` accepts any ``Solver`` instance,
-enabling new backends to be added without modifying the benchmarking code.
+Each one exposes ``name`` and ``solve(puzzle)``. ``solve`` returns ``{"solutions": [...]}``
+for the classical solver and ``{"counts": {...}}`` for the quantum ones.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Any
 
 from nonogram.errors import ClassicalSolverError, HardwareError, QuantumSolverError
@@ -20,32 +14,7 @@ Puzzle = tuple[list, list]
 """Type alias for (row_clues, col_clues)."""
 
 
-class Solver(ABC):
-    """Abstract base class for nonogram solvers."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Human-readable solver name (e.g. 'Classical', 'Quantum (Simulator)')."""
-
-    @abstractmethod
-    def solve(self, puzzle: Puzzle) -> dict[str, Any]:
-        """Solve a nonogram and return results.
-
-        Parameters
-        ----------
-        puzzle : Puzzle
-            (row_clues, col_clues) tuple.
-
-        Returns
-        -------
-        dict[str, Any]
-            Must include ``"solutions"`` (list[str]) for classical solvers
-            or ``"counts"`` (dict[str, int/float]) for quantum solvers.
-        """
-
-
-class ClassicalSolver(Solver):
+class ClassicalSolver:
     """Brute-force exhaustive search solver."""
 
     @property
@@ -62,7 +31,7 @@ class ClassicalSolver(Solver):
         return {"solutions": solutions}
 
 
-class QuantumSimulatorSolver(Solver):
+class QuantumSimulatorSolver:
     """Grover's algorithm on local statevector simulator."""
 
     @property
@@ -82,7 +51,7 @@ class QuantumSimulatorSolver(Solver):
         return {"counts": counts, "grover_result": result}
 
 
-class QuantumHardwareSolver(Solver):
+class QuantumHardwareSolver:
     """Grover's algorithm on IBM quantum hardware."""
 
     def __init__(

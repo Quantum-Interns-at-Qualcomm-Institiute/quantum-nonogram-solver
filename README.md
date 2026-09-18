@@ -64,7 +64,7 @@ for bs in classical_solve(puzzle):
 result = quantum_solve(puzzle)
 ```
 
-Solvers subclass `Solver` in `nonogram/solver.py`; `ClassicalSolver().solve(puzzle)` returns `{"solutions": [...]}` and `QuantumSimulatorSolver().solve(puzzle)` returns `{"counts": {...}, "iterations": ...}`. `ValidationError` is also a `ValueError` and `PuzzleIOError` is also an `OSError`, so ordinary `except` clauses still catch them.
+`nonogram/solver.py` holds the three solvers; `ClassicalSolver().solve(puzzle)` returns `{"solutions": [...]}` and `QuantumSimulatorSolver().solve(puzzle)` returns `{"counts": {...}, "iterations": ...}`. `ValidationError` is also a `ValueError` and `PuzzleIOError` is also an `OSError`, so ordinary `except` clauses still catch them.
 
 ## How it works
 
