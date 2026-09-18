@@ -1,7 +1,5 @@
-"""Pass C resource/robustness regressions (2026-09 security round).
-
-Covers: malformed-body 400s (not 500s) on solve and puzzle routes, the
-run-artifact cap, per-request hardware config shape, and sanitized errors.
+"""Resource and robustness checks: malformed bodies return 400 rather than 500,
+the run-artifact cap holds, hardware config shape is per-request, errors are sanitized.
 """
 
 from __future__ import annotations
