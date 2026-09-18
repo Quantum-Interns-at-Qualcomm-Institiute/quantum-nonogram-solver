@@ -240,7 +240,7 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
     return payload
 
 
-# ── Shared request preamble for the synchronous routes ───────────────────────
+# Shared request preamble for the synchronous routes
 
 
 def _acquire_or_busy():
@@ -276,8 +276,8 @@ def _parse_validated_clues():
 @bp.route("/api/solve/classical", methods=["POST"])
 def api_solve_classical():
     """Trigger a classical (brute-force) solve in a background thread."""
-    # Parse + validate (incl. the grid-area cap) BEFORE taking the busy lock, so a
-    # bad or oversized body (400/413) can never leave the solver wedged as busy.
+    # Parse and validate, including the grid-area cap, before taking the busy
+    # lock, so a bad or oversized body (400/413) leaves the solver free.
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
@@ -328,8 +328,8 @@ def api_solve_classical():
 @bp.route("/api/solve/quantum", methods=["POST"])
 def api_solve_quantum():
     """Trigger a quantum (Grover) solve in a background thread."""
-    # Parse + validate (incl. the grid-area cap) BEFORE taking the busy lock, so a
-    # bad or oversized body (400/413) can never leave the solver wedged as busy.
+    # Parse and validate, including the grid-area cap, before taking the busy
+    # lock, so a bad or oversized body (400/413) leaves the solver free.
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
@@ -386,8 +386,8 @@ def api_solve_quantum():
 @bp.route("/api/benchmark", methods=["POST"])
 def api_benchmark():
     """Run a benchmark comparing classical and quantum solvers."""
-    # Parse + validate (incl. the grid-area cap) BEFORE taking the busy lock, so a
-    # bad or oversized body (400/413) can never leave the solver wedged as busy.
+    # Parse and validate, including the grid-area cap, before taking the busy
+    # lock, so a bad or oversized body (400/413) leaves the solver free.
     data = request.json
     if data is None:
         return respond_error("invalid_json", "Invalid or missing JSON body", 400)
@@ -436,7 +436,7 @@ def api_benchmark():
     return jsonify({"ok": True})
 
 
-# ── Synchronous (curl-able) equivalents ──────────────────────────────────────
+# Synchronous (curl-able) equivalents
 
 
 @bp.route("/api/solve/classical/sync", methods=["POST"])

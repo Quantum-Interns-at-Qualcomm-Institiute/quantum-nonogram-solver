@@ -143,7 +143,7 @@ def display_nonogram(bit_string: str, n: int, d: int) -> None:
     print("╚" + "═" * d + "╝")
 
 
-# ── Grid helpers ─────────────────────────────────────────────────────────────
+# Grid helpers
 
 
 def rle(bits: list[bool]) -> tuple[int, ...]:
@@ -258,7 +258,7 @@ def parse_clue(text: str) -> tuple[int, ...]:
     return nums if any(n > 0 for n in nums) else (0,)
 
 
-# ── Boolean SAT encoding ─────────────────────────────────────────────────────
+# Boolean SAT encoding
 
 
 def puzzle_to_boolean(
@@ -364,14 +364,14 @@ def puzzle_to_boolean(
         bool_expr = f"({OR.join(bool_clauses)}){AND}"
         return bool_expr, cl_clauses
 
-    # --- row constraints ---
+    # row constraints
     for r_idx, r_clue in enumerate(row_clues):
         var_indices = [r_v[r_idx][c] for c in range(d)]
         bool_expr, cl_clauses = _encode_constraint(r_clue, d, var_indices, f"Row {r_idx + 1}")
         boolean_statement += bool_expr
         classical_statement.append(cl_clauses)
 
-    # --- column constraints ---
+    # column constraints
     for c_idx, c_clue in enumerate(col_clues):
         var_indices = [r_v[r][c_idx] for r in range(n)]
         bool_expr, cl_clauses = _encode_constraint(c_clue, n, var_indices, f"Column {c_idx + 1}")

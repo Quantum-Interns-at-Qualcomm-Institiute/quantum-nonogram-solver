@@ -51,7 +51,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
-# ── path setup ────────────────────────────────────────────────────────────────
+# path setup
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT))
@@ -65,7 +65,7 @@ from tools.config import MAX_CLUES, MAX_CONTENT_LENGTH, MAX_GRID  # noqa: E402
 from tools.errors import register_error_handlers  # noqa: E402
 from tools.routes import ALL_BLUEPRINTS  # noqa: E402
 
-# ── Flask setup ──────────────────────────────────────────────────────────────
+# Flask setup
 app = Flask(__name__)
 # Cap request bodies — clues are a few hundred bytes of JSON; this rejects
 # oversized payloads with a 413 before Flask parses them.
@@ -104,7 +104,7 @@ socketio = SocketIO(
 )
 
 
-# ── Front-door guard (fail closed) ───────────────────────────────────────────
+# Front-door guard (fail closed)
 # Every route but /health needs the gateway's X-Origin-Secret. With ORIGIN_SECRET
 # unset the API refuses to serve (unless NONOGRAM_ALLOW_INSECURE=1): the hardware
 # routes would otherwise spend real IBM Quantum credits for any caller.
@@ -141,7 +141,7 @@ for bp in ALL_BLUEPRINTS:
 register_error_handlers(app)
 
 
-# ── Config API (frontend lives in the website repo) ──────────────────────────
+# Config API (frontend lives in the website repo)
 
 
 @app.route("/api/config")
@@ -152,7 +152,7 @@ def api_config():
     return jsonify({"max_clues": MAX_CLUES, "max_grid": MAX_GRID})
 
 
-# ── Entry point ──────────────────────────────────────────────────────────────
+# Entry point
 
 
 def _get_ssl_context():

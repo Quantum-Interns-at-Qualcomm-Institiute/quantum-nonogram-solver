@@ -12,7 +12,7 @@ from nonogram.classical import classical_solve
 from nonogram.errors import QuantumSolverError, ValidationError
 from nonogram.quantum import quantum_solve
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _assert_quantum_finds_classical(puzzle):
@@ -42,7 +42,7 @@ def _assert_quantum_finds_classical(puzzle):
     )
 
 
-# ── 1×1 puzzles ─────────────────────────────────────────────────────────────
+# 1×1 puzzles
 
 
 def test_quantum_1x1_filled():
@@ -53,7 +53,7 @@ def test_quantum_1x1_empty():
     _assert_quantum_finds_classical(([(0,)], [(0,)]))
 
 
-# ── 2×2 puzzles ─────────────────────────────────────────────────────────────
+# 2×2 puzzles
 
 
 def test_quantum_2x2_all_filled():
@@ -73,7 +73,7 @@ def test_quantum_2x2_top_row():
     _assert_quantum_finds_classical(([(2,), (0,)], [(1,), (1,)]))
 
 
-# ── 3×3 puzzles ─────────────────────────────────────────────────────────────
+# 3×3 puzzles
 
 
 def test_quantum_3x3_l_shape():
@@ -93,7 +93,7 @@ def test_quantum_3x3_all_empty():
     _assert_quantum_finds_classical(([(0,), (0,), (0,)], [(0,), (0,), (0,)]))
 
 
-# ── Rectangular puzzles ──────────────────────────────────────────────────────
+# Rectangular puzzles
 
 
 def test_quantum_2x3_rectangular():
@@ -108,7 +108,7 @@ def test_quantum_1x3_single_row():
     _assert_quantum_finds_classical(([(1, 1)], [(1,), (0,), (1,)]))
 
 
-# ── Multi-block clues ────────────────────────────────────────────────────────
+# Multi-block clues
 
 
 def test_quantum_multiblock_1_1():
@@ -116,7 +116,7 @@ def test_quantum_multiblock_1_1():
     _assert_quantum_finds_classical(([(1, 1)], [(1,), (0,), (1,)]))
 
 
-# ── Bitstring structure ──────────────────────────────────────────────────────
+# Bitstring structure
 
 
 def test_bitstring_chars_are_01():
@@ -140,7 +140,7 @@ def test_bitstring_length_matches_grid():
             assert len(bs) == n * d, f"Expected len={n*d}, got {len(bs)} for {n}x{d}"
 
 
-# ── Result structure ─────────────────────────────────────────────────────────
+# Result structure
 
 
 def test_result_has_circuit_results():
@@ -153,7 +153,7 @@ def test_result_has_circuit_results():
     assert all(isinstance(v, (int, float)) for v in counts.values())
 
 
-# ── Error handling ───────────────────────────────────────────────────────────
+# Error handling
 
 
 def test_impossible_clues_raises():
@@ -162,7 +162,7 @@ def test_impossible_clues_raises():
         quantum_solve(([(3,)], [(1,)]))
 
 
-# ── extract_counts tests ─────────────────────────────────────────────────────
+# extract_counts tests
 
 
 class TestExtractCounts:
@@ -222,7 +222,7 @@ class TestExtractCounts:
             extract_counts(EmptyDataBin(), ["meas"])
 
 
-# ── Cross-validation with classical solver ────────────────────────────────────
+# Cross-validation with classical solver
 
 
 @pytest.mark.parametrize(

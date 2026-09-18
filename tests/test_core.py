@@ -7,9 +7,7 @@ import pytest
 
 from nonogram.core import display_nonogram, puzzle_to_boolean, validate, var_clauses
 
-# ---------------------------------------------------------------------------
 # var_clauses
-# ---------------------------------------------------------------------------
 
 
 class TestVarClauses:
@@ -45,9 +43,7 @@ class TestVarClauses:
         assert row_vars_sq == row_vars_rect
 
 
-# ---------------------------------------------------------------------------
 # validate
-# ---------------------------------------------------------------------------
 
 
 class TestValidate:
@@ -63,9 +59,7 @@ class TestValidate:
             validate(2, 3, [(1,), (1,)], [(1,), (1,)])
 
 
-# ---------------------------------------------------------------------------
 # display_nonogram
-# ---------------------------------------------------------------------------
 
 
 class TestDisplayNonogram:
@@ -97,9 +91,7 @@ class TestDisplayNonogram:
             display_nonogram("10", 2, 3)
 
 
-# ---------------------------------------------------------------------------
 # puzzle_to_boolean
-# ---------------------------------------------------------------------------
 
 
 class TestPuzzleToBooleanQuantum:

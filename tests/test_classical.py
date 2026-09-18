@@ -3,9 +3,7 @@
 
 from nonogram.classical import classical_solve
 
-# ---------------------------------------------------------------------------
 # Small known puzzles
-# ---------------------------------------------------------------------------
 
 
 class TestClassicalSolveSmall:
@@ -43,9 +41,7 @@ class TestClassicalSolveSmall:
         assert results == ["0000"]
 
 
-# ---------------------------------------------------------------------------
 # manual_check path
-# ---------------------------------------------------------------------------
 
 
 class TestManualCheck:
@@ -66,9 +62,7 @@ class TestManualCheck:
         assert results == ["0000"]
 
 
-# ---------------------------------------------------------------------------
 # Demo puzzles — exhaustive search and known-solution validation
-# ---------------------------------------------------------------------------
 
 
 class TestDemoPuzzle:

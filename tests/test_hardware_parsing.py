@@ -20,9 +20,7 @@ import dataclasses
 import pytest
 from conftest import load_ibm_token
 
-# ---------------------------------------------------------------------------
 # Test 1: DataBin parsing logic (ZERO API cost — pure Python mock)
-# ---------------------------------------------------------------------------
 
 
 def test_databin_parsing_logic():
@@ -48,7 +46,7 @@ def test_databin_parsing_logic():
         DataBinCls = dataclasses.make_dataclass("DataBin", [(field_name, object)])
         data = DataBinCls(**{field_name: _FakeBitArray(expected_counts)})
 
-        # ── same logic as quantum_solve_hardware ──────────────────────
+        # same logic as quantum_solve_hardware
         counts = None
         try:
             fields = dataclasses.fields(data)
@@ -67,7 +65,6 @@ def test_databin_parsing_logic():
                 if candidate is not None and hasattr(candidate, "get_counts"):
                     counts = candidate.get_counts()
                     break
-        # ─────────────────────────────────────────────────────────────
 
         return counts
 
@@ -92,9 +89,7 @@ def test_databin_parsing_logic():
     print("✓  DataBin parsing logic handles all register-name variants.")
 
 
-# ---------------------------------------------------------------------------
 # Test 2: list_backends() auth (1 REST call, zero compute cost)
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.skipif(

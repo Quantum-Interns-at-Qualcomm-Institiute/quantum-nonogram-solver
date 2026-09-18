@@ -13,13 +13,11 @@ from __future__ import annotations
 from nonogram.core import grid_to_clues
 from nonogram.core import rle as _rle
 
-# ===========================================================================
 # _rle — run-length encode a boolean sequence
-# ===========================================================================
 
 
 class TestRle:
-    # --- basic correctness ---
+    # basic correctness
 
     def test_all_false_returns_empty_clue(self):
         """An entirely empty row should have no filled groups."""
@@ -63,7 +61,7 @@ class TestRle:
         # TT F TTT  →  2, 3
         assert _rle([True, True, False, True, True, True]) == (2, 3)
 
-    # --- return-type contract ---
+    # return-type contract
 
     def test_returns_tuple(self):
         assert isinstance(_rle([True, False]), tuple)
@@ -72,7 +70,7 @@ class TestRle:
         result = _rle([True, True, False, True])
         assert all(isinstance(v, int) for v in result)
 
-    # --- edge cases ---
+    # edge cases
 
     def test_single_element_true(self):
         assert _rle([True]) == (1,)
@@ -84,9 +82,7 @@ class TestRle:
         assert _rle([False, False]) == (0,)
 
 
-# ===========================================================================
 # grid_to_clues — derive row and column clues from a 2-D boolean grid
-# ===========================================================================
 
 
 def _grid(rows: list[list[bool]]) -> list[list[bool]]:
@@ -95,7 +91,7 @@ def _grid(rows: list[list[bool]]) -> list[list[bool]]:
 
 
 class TestGridToClues:
-    # --- shape ---
+    # shape
 
     def test_returns_two_lists(self):
         grid = [[False, False], [False, False]]
@@ -113,7 +109,7 @@ class TestGridToClues:
         _, col_clues = grid_to_clues(grid)
         assert len(col_clues) == 5
 
-    # --- empty grid ---
+    # empty grid
 
     def test_empty_grid_all_zero_clues(self):
         grid = [[False, False], [False, False]]
@@ -121,7 +117,7 @@ class TestGridToClues:
         assert all(c == (0,) for c in row_clues)
         assert all(c == (0,) for c in col_clues)
 
-    # --- fully filled grid ---
+    # fully filled grid
 
     def test_full_grid_row_clues_equal_col_count(self):
         n, d = 3, 4
@@ -130,7 +126,7 @@ class TestGridToClues:
         assert all(c == (d,) for c in row_clues)
         assert all(c == (n,) for c in col_clues)
 
-    # --- known patterns ---
+    # known patterns
 
     def test_diagonal_2x2(self):
         grid = [
@@ -182,7 +178,7 @@ class TestGridToClues:
         _, col_clues = grid_to_clues(grid)
         assert col_clues[0] == (2, 1)
 
-    # --- clue usability ---
+    # clue usability
 
     def test_clues_can_be_passed_directly_to_solver(self):
         """grid_to_clues output must feed straight into classical_solve."""

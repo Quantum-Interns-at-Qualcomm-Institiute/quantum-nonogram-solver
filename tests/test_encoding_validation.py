@@ -11,9 +11,7 @@ import pytest
 from nonogram.core import puzzle_to_boolean
 from nonogram.errors import ValidationError
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 
 def _eval_boolean_expr(expr: str, assignment: dict[int, bool]) -> bool:
@@ -41,9 +39,7 @@ def _all_bitstrings(length: int):
         yield "".join(combo)
 
 
-# ---------------------------------------------------------------------------
 # 1x1 puzzles
-# ---------------------------------------------------------------------------
 
 
 class TestOneByOne:
@@ -65,9 +61,7 @@ class TestOneByOne:
         assert not _eval_boolean_expr(expr, {0: True})
 
 
-# ---------------------------------------------------------------------------
 # 2x2 puzzles with known solutions
-# ---------------------------------------------------------------------------
 
 
 class TestTwoByTwo:
@@ -100,9 +94,7 @@ class TestTwoByTwo:
             _eval_boolean_expr(expr, _bitstring_to_assignment(bits))
 
 
-# ---------------------------------------------------------------------------
 # 3x3 puzzles — constraint group count
-# ---------------------------------------------------------------------------
 
 
 class TestThreeByThree:
@@ -135,9 +127,7 @@ class TestThreeByThree:
         assert _eval_boolean_expr(expr, _bitstring_to_assignment("111111111"))
 
 
-# ---------------------------------------------------------------------------
 # Classical mode — clause count and variable count
-# ---------------------------------------------------------------------------
 
 
 class TestClassicalOutput:
@@ -172,9 +162,7 @@ class TestClassicalOutput:
         assert num_vars == 6
 
 
-# ---------------------------------------------------------------------------
 # Classical literal range
-# ---------------------------------------------------------------------------
 
 
 class TestClassicalLiteralRange:
@@ -209,9 +197,7 @@ class TestClassicalLiteralRange:
                 assert 0 not in clause
 
 
-# ---------------------------------------------------------------------------
 # Balanced parentheses
-# ---------------------------------------------------------------------------
 
 
 class TestBalancedParentheses:
@@ -240,9 +226,7 @@ class TestBalancedParentheses:
         assert depth == 0, f"Unbalanced parentheses: {depth} unclosed"
 
 
-# ---------------------------------------------------------------------------
 # ValidationError for impossible clues
-# ---------------------------------------------------------------------------
 
 
 class TestValidationErrorOnImpossibleClues:
@@ -269,9 +253,7 @@ class TestValidationErrorOnImpossibleClues:
             puzzle_to_boolean([(3,)], [(1,), (1,)])
 
 
-# ---------------------------------------------------------------------------
 # Rectangular grids
-# ---------------------------------------------------------------------------
 
 
 class TestRectangularGrids:
@@ -307,9 +289,7 @@ class TestRectangularGrids:
         assert _eval_boolean_expr(expr, _bitstring_to_assignment("110001"))
 
 
-# ---------------------------------------------------------------------------
 # Multi-block clues
-# ---------------------------------------------------------------------------
 
 
 class TestMultiBlockClues:
@@ -346,9 +326,7 @@ class TestMultiBlockClues:
         assert len(row0_clauses[0]) == 3  # 3 literals per clause
 
 
-# ---------------------------------------------------------------------------
 # Boolean expression evaluates correctly for known solutions
-# ---------------------------------------------------------------------------
 
 
 class TestKnownSolutionEvaluation:
@@ -385,9 +363,7 @@ class TestKnownSolutionEvaluation:
         assert _eval_boolean_expr(expr, _bitstring_to_assignment(solution))
 
 
-# ---------------------------------------------------------------------------
 # Classical clause list correctly rejects invalid bitstrings
-# ---------------------------------------------------------------------------
 
 
 class TestClassicalRejection:
@@ -410,8 +386,7 @@ class TestClassicalRejection:
                 clause_sat = True
                 for lit in clause:
                     var_idx = abs(lit) - 1
-                    # _classical_literal: bit_set -> -(1+idx), not bit_set -> +(1+idx)
-                    # So negative literal means cell is set, positive means cell is not set.
+                    # A negative literal means the cell is set; a positive one means it is clear.
                     if lit < 0:
                         if bits[var_idx] != 1:
                             clause_sat = False

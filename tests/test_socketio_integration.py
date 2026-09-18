@@ -87,7 +87,7 @@ def collect_events(sio_client, target_event, timeout=10.0):
     return found
 
 
-# ── Connection ───────────────────────────────────────────────────────────────
+# Connection
 
 
 class TestSocketConnection:
@@ -105,7 +105,7 @@ class TestSocketConnection:
         client2.disconnect()
 
 
-# ── Grid API + Socket.IO status events ───────────────────────────────────────
+# Grid API + Socket.IO status events
 
 
 class TestGridEvents:
@@ -133,7 +133,7 @@ class TestGridEvents:
         assert "grid" in data
 
 
-# ── Classical solve flow ─────────────────────────────────────────────────────
+# Classical solve flow
 
 
 class TestClassicalSolveFlow:
@@ -160,7 +160,7 @@ class TestClassicalSolveFlow:
         assert "status" in event_names or "cl_done" in event_names
 
 
-# ── Quantum solve flow ───────────────────────────────────────────────────────
+# Quantum solve flow
 
 
 try:
@@ -196,7 +196,7 @@ class TestQuantumSolveFlow:
         assert "status" in event_names or "qu_done" in event_names
 
 
-# ── Benchmark flow ───────────────────────────────────────────────────────────
+# Benchmark flow
 
 
 @pytest.mark.skipif(not _HAS_QUANTUM, reason="qiskit not installed (benchmark runs quantum solver)")
@@ -228,7 +228,7 @@ class TestBenchmarkFlow:
         )
 
 
-# ── Error handling ───────────────────────────────────────────────────────────
+# Error handling
 
 
 class TestSolverErrors:
@@ -251,5 +251,5 @@ class TestSolverErrors:
         # 10x10 all filled — large but solvable
         payload = {"row_clues": [[10]] * 10, "col_clues": [[10]] * 10}
         resp = http_client.post("/api/solve/classical", json=payload)
-        # Should either succeed or return an error, not hang
+        # The call returns a status code within the timeout.
         assert resp.status_code in (200, 400, 409, 413, 422, 500)

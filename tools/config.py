@@ -11,7 +11,7 @@ MAX_GRID = 10
 MAX_CONTENT_LENGTH = 256 * 1024  # 256 KB
 
 # Each trial is a full solve, so this bounds compute; above it requests are clamped
-# (the UI offers 20; more trials add sampling noise, not information).
+# (the UI offers 20; beyond that the extra trials only add sampling noise).
 MAX_TRIALS = 25
 
 PUZZLES_DIR = ROOT / "puzzles"

@@ -189,7 +189,7 @@ class TestHardwareAPIContract:
     """POST /api/hw/config and /api/hw/backends."""
 
     def test_connect_response(self, client, monkeypatch):
-        # Credentials are server-held (env), not part of the request body.
+        # Credentials come from the environment; the request body carries none.
         monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
         cfg = {
             "channel": "ibm_quantum_platform",
