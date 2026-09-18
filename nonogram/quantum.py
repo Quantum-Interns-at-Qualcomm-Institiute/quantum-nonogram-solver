@@ -28,9 +28,7 @@ from __future__ import annotations
 from nonogram.core import puzzle_to_boolean
 from nonogram.errors import HardwareError, QuantumSolverError
 
-# ---------------------------------------------------------------------------
 # Local simulator path
-# ---------------------------------------------------------------------------
 
 
 def quantum_solve(puzzle: tuple[list, list]):
@@ -55,9 +53,7 @@ def quantum_solve(puzzle: tuple[list, list]):
     return grover.amplify(problem)
 
 
-# ---------------------------------------------------------------------------
 # Real hardware path (IBM Qiskit Runtime)
-# ---------------------------------------------------------------------------
 
 
 # One parameter per hardware-run knob; a config object would only rename them.
@@ -130,7 +126,7 @@ def quantum_solve_hardware(  # noqa: PLR0913
     from qiskit_algorithms import AmplificationProblem, Grover
     from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
 
-    # ── Connect ──────────────────────────────────────────────────────────
+    # Connect
     service = QiskitRuntimeService(channel=channel, token=token)
     if backend_name:
         backend = service.backend(backend_name)
@@ -142,7 +138,7 @@ def quantum_solve_hardware(  # noqa: PLR0913
         except Exception:
             backend = service.least_busy(operational=True)
 
-    # ── Build Grover circuit ─────────────────────────────────────────────
+    # Build Grover circuit
     expression = puzzle_to_boolean(row_clues=puzzle[0], col_clues=puzzle[1])
     oracle = PhaseOracleGate(expression)
     problem = AmplificationProblem(oracle)
@@ -165,11 +161,11 @@ def quantum_solve_hardware(  # noqa: PLR0913
         )
     creg_names = [cr.name for cr in transpiled.cregs]
 
-    # ── Submit and wait ──────────────────────────────────────────────────
+    # Submit and wait
     sampler = SamplerV2(backend)
     sampler.options.default_shots = shots
 
-    # ── Error-mitigation options ─────────────────────────────────────────
+    # Error-mitigation options
     # Dynamical decoupling inserts pulse sequences during idle qubit periods
     # to suppress decoherence — always a win on real hardware.
     if dynamical_decoupling:
@@ -295,9 +291,7 @@ def extract_counts(data, creg_names: list[str]) -> dict[str, int]:  # noqa: C901
     return bit_array.get_counts()
 
 
-# ---------------------------------------------------------------------------
 # Backend enumeration helper (used by the GUI settings dialog)
-# ---------------------------------------------------------------------------
 
 
 def list_backends(

@@ -28,8 +28,8 @@ def api_puzzle_load():
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         f.save(tmp.name)
         try:
-            # load_puzzle validates clue shape, values, and the per-line size cap
-            # BEFORE we allocate the grid below. A bad upload is a 400, not a 500.
+            # load_puzzle validates clue shape, values and the per-line size cap
+            # before the grid below is allocated, so a bad upload is a 400.
             data = load_puzzle(tmp.name)
         except (ValidationError, PuzzleIOError, ValueError, KeyError) as exc:
             return respond_error("invalid_puzzle", str(exc)[:500], 400)

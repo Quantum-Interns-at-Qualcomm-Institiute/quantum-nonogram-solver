@@ -7,7 +7,7 @@ from typing import Any
 
 from flask_socketio import SocketIO
 
-# ── Server state (single-user local app) ────────────────────────────────────
+# Server state (single-user local app)
 _DEFAULT_SIZE = 4
 state: dict[str, Any] = {
     "rows": _DEFAULT_SIZE,

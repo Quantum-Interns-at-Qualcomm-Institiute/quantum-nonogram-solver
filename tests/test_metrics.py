@@ -19,9 +19,7 @@ from nonogram.metrics import (
     print_report,
 )
 
-# ---------------------------------------------------------------------------
 # Helpers / shared fixtures
-# ---------------------------------------------------------------------------
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2×2, 4 variables
 SMALL_SOLUTION = "1001"
@@ -52,9 +50,7 @@ def _make_quantum() -> QuantumMetrics:
     )
 
 
-# ---------------------------------------------------------------------------
 # ClassicalMetrics
-# ---------------------------------------------------------------------------
 
 
 class TestClassicalMetrics:
@@ -72,9 +68,7 @@ class TestClassicalMetrics:
         assert math.isinf(cm.configs_per_second)
 
 
-# ---------------------------------------------------------------------------
 # ComparisonReport derived fields
-# ---------------------------------------------------------------------------
 
 
 class TestComparisonReport:
@@ -120,9 +114,7 @@ class TestComparisonReport:
         assert r.theoretical_grover_speedup == pytest.approx(math.sqrt(2**24))
 
 
-# ---------------------------------------------------------------------------
 # benchmark() — classical-only path (fast, no qiskit)
-# ---------------------------------------------------------------------------
 
 
 class TestBenchmarkClassicalOnly:
@@ -165,9 +157,7 @@ class TestBenchmarkClassicalOnly:
         assert result.quantum is None
 
 
-# ---------------------------------------------------------------------------
 # print_report() — output structure tests (no quantum needed)
-# ---------------------------------------------------------------------------
 
 
 class TestPrintReport:

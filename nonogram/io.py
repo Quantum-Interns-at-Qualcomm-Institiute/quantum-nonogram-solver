@@ -53,9 +53,7 @@ _MAX_LINE = 10  # the largest grid side the lookup tables cover
 _MAX_CELLS = 20
 
 
-# ---------------------------------------------------------------------------
 # Internal helpers
-# ---------------------------------------------------------------------------
 
 
 def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
@@ -105,9 +103,7 @@ def _to_serialisable(clues: list) -> list[list[int]]:
     return [[int(v) for v in group] for group in clues]
 
 
-# ---------------------------------------------------------------------------
 # Public API
-# ---------------------------------------------------------------------------
 
 
 def save_puzzle(

@@ -19,9 +19,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-# ---------------------------------------------------------------------------
 # Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture()
@@ -71,9 +69,7 @@ def client(app):
     return app.test_client()
 
 
-# ---------------------------------------------------------------------------
 # Grid routes
-# ---------------------------------------------------------------------------
 
 
 class TestGridRoutes:
@@ -107,9 +103,7 @@ class TestGridRoutes:
         assert data["cols"] == 4
 
 
-# ---------------------------------------------------------------------------
 # Puzzle routes
-# ---------------------------------------------------------------------------
 
 
 class TestPuzzleRoutes:
@@ -158,9 +152,7 @@ class TestPuzzleRoutes:
         assert resp.status_code == 400
 
 
-# ---------------------------------------------------------------------------
 # Solver routes
-# ---------------------------------------------------------------------------
 
 
 class TestSolverRoutes:
@@ -245,7 +237,7 @@ class TestSolveDoSGuards:
         assert resp.status_code == 413
 
     def test_bad_request_does_not_wedge_busy(self, client):
-        # An oversized-grid 400 must NOT hold the busy lock — a valid solve still runs.
+        # An oversized-grid 400 releases the busy lock, so a valid solve still runs.
         from tools.state import state, state_lock
 
         assert client.post("/api/solve/classical", json=self.OVERSIZED).status_code == 400
@@ -272,9 +264,7 @@ class TestSolveDoSGuards:
         assert len(resp.get_json()["cl_times"]) == MAX_TRIALS
 
 
-# ---------------------------------------------------------------------------
 # Hardware routes
-# ---------------------------------------------------------------------------
 
 
 class TestHardwareRoutes:
@@ -324,9 +314,7 @@ class TestHardwareRoutes:
         assert client.post("/api/hw/backends", json=attacker).status_code == 503
 
 
-# ---------------------------------------------------------------------------
 # Runs routes
-# ---------------------------------------------------------------------------
 
 
 class TestRunsRoutes:

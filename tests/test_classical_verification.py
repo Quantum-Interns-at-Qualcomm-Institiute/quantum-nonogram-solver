@@ -11,7 +11,7 @@ import pytest
 from nonogram.classical import classical_solve
 from nonogram.core import rle
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# Helpers
 
 
 def _verify_solution(bitstring: str, row_clues: list, col_clues: list) -> None:
@@ -36,7 +36,7 @@ def _verify_solution(bitstring: str, row_clues: list, col_clues: list) -> None:
         assert got == expect, f"Col {c}: expected {expect}, got {got} from {col_bits}"
 
 
-# ── 1×1 puzzles ─────────────────────────────────────────────────────────────
+# 1×1 puzzles
 
 
 def test_1x1_filled():
@@ -53,7 +53,7 @@ def test_1x1_empty():
     _verify_solution(solutions[0], puzzle[0], puzzle[1])
 
 
-# ── 2×2 puzzles ─────────────────────────────────────────────────────────────
+# 2×2 puzzles
 
 
 def test_2x2_all_filled():
@@ -86,7 +86,7 @@ def test_2x2_top_row_filled():
     _verify_solution(solutions[0], puzzle[0], puzzle[1])
 
 
-# ── 3×3 puzzles ─────────────────────────────────────────────────────────────
+# 3×3 puzzles
 
 
 def test_3x3_unique_solution():
@@ -124,7 +124,7 @@ def test_3x3_multiple_solutions():
         _verify_solution(sol, puzzle[0], puzzle[1])
 
 
-# ── Rectangular puzzles ──────────────────────────────────────────────────────
+# Rectangular puzzles
 
 
 def test_2x3_rectangular():
@@ -145,7 +145,7 @@ def test_3x2_rectangular():
     _verify_solution(solutions[0], puzzle[0], puzzle[1])
 
 
-# ── No-solution puzzles ──────────────────────────────────────────────────────
+# No-solution puzzles
 
 
 def test_impossible_puzzle_returns_empty():
@@ -156,7 +156,7 @@ def test_impossible_puzzle_returns_empty():
     assert solutions == []
 
 
-# ── manual_check path ────────────────────────────────────────────────────────
+# manual_check path
 
 
 def test_manual_check_valid_solution():
@@ -174,7 +174,7 @@ def test_manual_check_invalid_solution():
     assert solutions == []
 
 
-# ── Edge case: fully determined by one constraint ────────────────────────────
+# Edge case: fully determined by one constraint
 
 
 def test_single_row_single_col():
@@ -186,7 +186,7 @@ def test_single_row_single_col():
     _verify_solution(solutions[0], puzzle[0], puzzle[1])
 
 
-# ── All solutions of every size satisfy constraints ──────────────────────────
+# All solutions of every size satisfy constraints
 
 
 @pytest.mark.parametrize(

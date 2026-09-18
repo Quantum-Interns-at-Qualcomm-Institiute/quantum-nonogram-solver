@@ -17,9 +17,7 @@ from flask_socketio import SocketIOTestClient
 from tools.config import MAX_CLUES, MAX_GRID
 from tools.webapp import app, socketio
 
-# ---------------------------------------------------------------------------
 # Fixtures
-# ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
 def _reset_state():
@@ -53,7 +51,7 @@ def sio_client():
     client.disconnect()
 
 
-# -- Tiny 2x2 puzzle clues used throughout the tests -----------------------
+# Tiny 2x2 puzzle clues used throughout the tests
 
 # A valid 2x2 puzzle: fully filled grid [[True, True], [True, True]]
 # Row clues: [2], [2]   Col clues: [2], [2]
@@ -65,9 +63,7 @@ SMALL_ROW_CLUES = [[1, 1], [1], [1, 1]]
 SMALL_COL_CLUES = [[1, 1], [1], [1, 1]]
 
 
-# ---------------------------------------------------------------------------
 # 1. Full solve pipeline: POST grid -> POST solve/classical -> Socket.IO
-# ---------------------------------------------------------------------------
 
 class TestClassicalSolvePipeline:
     """POST /api/grid then POST /api/solve/classical — verify HTTP response."""
@@ -95,9 +91,7 @@ class TestClassicalSolvePipeline:
         time.sleep(1)
 
 
-# ---------------------------------------------------------------------------
 # 2. Full solve pipeline: POST grid -> POST solve/quantum -> Socket.IO
-# ---------------------------------------------------------------------------
 
 class TestQuantumSolvePipeline:
     """POST /api/grid then POST /api/solve/quantum — verify HTTP response."""
@@ -117,9 +111,7 @@ class TestQuantumSolvePipeline:
         time.sleep(2)
 
 
-# ---------------------------------------------------------------------------
 # 3. Benchmark endpoint with trials=1 -> verify bench_done event
-# ---------------------------------------------------------------------------
 
 class TestBenchmarkEndpoint:
     """POST /api/benchmark with trials=1 and verify bench_done payload."""
@@ -138,9 +130,7 @@ class TestBenchmarkEndpoint:
         time.sleep(3)
 
 
-# ---------------------------------------------------------------------------
 # 4. Grid randomize -> verify random grid has valid clues
-# ---------------------------------------------------------------------------
 
 class TestGridRandomize:
     """POST /api/randomize and verify the returned grid is well-formed."""
@@ -174,9 +164,7 @@ class TestGridRandomize:
         assert data["cols"] == 4
 
 
-# ---------------------------------------------------------------------------
 # 5. Puzzle save -> load roundtrip
-# ---------------------------------------------------------------------------
 
 class TestPuzzleSaveLoadRoundtrip:
     """Save a puzzle via /api/puzzle/save, then load it back."""
@@ -216,9 +204,7 @@ class TestPuzzleSaveLoadRoundtrip:
         assert loaded["col_clues"] == SMALL_COL_CLUES
 
 
-# ---------------------------------------------------------------------------
 # 6. Puzzle load with invalid JSON -> verify 400
-# ---------------------------------------------------------------------------
 
 class TestPuzzleLoadInvalidJSON:
     """Upload malformed data to /api/puzzle/load and expect an error."""
@@ -245,9 +231,7 @@ class TestPuzzleLoadInvalidJSON:
         assert rv.get_json()["error"]["message"] == "No file"
 
 
-# ---------------------------------------------------------------------------
 # 7. Config endpoint returns max_grid and max_clues
-# ---------------------------------------------------------------------------
 
 class TestConfigEndpoint:
     """GET /api/config returns correct solver limits."""
@@ -263,9 +247,7 @@ class TestConfigEndpoint:
         assert data["max_clues"] == 3
 
 
-# ---------------------------------------------------------------------------
 # 8. Grid with out-of-bounds dimensions -> verify clamping
-# ---------------------------------------------------------------------------
 
 class TestGridClamping:
     """POST /api/grid with extreme dimensions should be clamped."""
@@ -283,9 +265,7 @@ class TestGridClamping:
         assert rv.status_code == 400
 
 
-# ---------------------------------------------------------------------------
 # 9. Concurrent solve rejection (busy state -> 409)
-# ---------------------------------------------------------------------------
 
 class TestConcurrentSolveRejection:
     """When the solver is busy, new solve requests should get 409."""
@@ -335,9 +315,7 @@ class TestConcurrentSolveRejection:
         assert rv.status_code == 409
 
 
-# ---------------------------------------------------------------------------
 # 10. Runs info and delete cycle
-# ---------------------------------------------------------------------------
 
 class TestRunsInfoDeleteCycle:
     """GET /api/runs/info and POST /api/runs/delete lifecycle."""
@@ -402,9 +380,7 @@ class TestRunsInfoDeleteCycle:
         assert rv.get_json()["count"] == 0
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 def _collect_events(
     sio_client: SocketIOTestClient,

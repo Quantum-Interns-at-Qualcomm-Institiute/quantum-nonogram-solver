@@ -23,9 +23,7 @@ from itertools import combinations
 
 from nonogram.core import puzzle_to_boolean
 
-# ---------------------------------------------------------------------------
 # Dataclasses
-# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -271,7 +269,7 @@ class HardwareRequirements:
 class ComparisonReport:
     """Side-by-side comparison of classical and quantum nonogram solving."""
 
-    # --- puzzle metadata ---
+    # puzzle metadata
     rows: int
     cols: int
     num_variables: int
@@ -283,17 +281,17 @@ class ComparisonReport:
     boolean_expression_length: int
     """Character length of the boolean SAT expression (proxy for problem complexity)."""
 
-    # --- solver results (None if that solver was not run) ---
+    # solver results (None if that solver was not run)
     classical: ClassicalMetrics | None = None
     quantum: QuantumMetrics | None = None
 
-    # --- static analysis (None if not computed) ---
+    # static analysis (None if not computed)
     static_circuit: StaticCircuitAnalysis | None = None
 
-    # --- constraint density (None if not computed) ---
+    # constraint density (None if not computed)
     constraint_density_metrics: dict | None = None
 
-    # --- new metric categories ---
+    # new metric categories
     solution_space: SolutionSpaceMetrics | None = None
     hardware_requirements: HardwareRequirements | None = None
 
@@ -309,7 +307,7 @@ class ComparisonReport:
     confidence_runs_99: float = 0.0
     """Estimated runs needed for 99% probability of finding all solutions."""
 
-    # --- derived comparison metrics ---
+    # derived comparison metrics
     theoretical_grover_speedup: float = field(init=False, default=0.0)
     """√(search_space) — the asymptotic Grover speedup over exhaustive search."""
 
@@ -334,9 +332,7 @@ class ComparisonReport:
             )
 
 
-# ---------------------------------------------------------------------------
 # Static circuit analysis
-# ---------------------------------------------------------------------------
 
 
 def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
@@ -384,9 +380,7 @@ def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
     )
 
 
-# ---------------------------------------------------------------------------
 # New metric helpers
-# ---------------------------------------------------------------------------
 
 
 def _hamming_distance(a: str, b: str) -> int:
@@ -468,9 +462,7 @@ def _distribution_entropy(counts: dict[str, int | float]) -> float:
     return entropy
 
 
-# ---------------------------------------------------------------------------
 # Benchmark runner
-# ---------------------------------------------------------------------------
 
 
 # Runs both solvers end to end into one report: long, but linear.
@@ -525,7 +517,7 @@ def benchmark(  # noqa: PLR0915
     conf_99 = 0.0
     classical_solutions_bs: list[str] = []
 
-    # --- Classical ---
+    # Classical
     if run_classical:
         from nonogram.classical import classical_solve
 
@@ -550,7 +542,7 @@ def benchmark(  # noqa: PLR0915
             early_terminations=exec_counts.early_terminations,
         )
 
-    # --- Quantum ---
+    # Quantum
     if run_quantum:
         from qiskit.circuit.library import PhaseOracleGate
         from qiskit.primitives import StatevectorSampler
@@ -612,21 +604,21 @@ def benchmark(  # noqa: PLR0915
         if valid_solutions > 0 and top_prob > 0:
             conf_95, conf_99 = compute_confidence_runs(valid_solutions, top_prob)
 
-    # --- Static circuit analysis ---
+    # Static circuit analysis
     if static_analysis:
         static_circuit = analyze_circuit(puzzle)
 
-    # --- Constraint density ---
+    # Constraint density
     if compute_constraint_density:
         from nonogram.data import constraint_density
 
         density_metrics = constraint_density(row_clues, col_clues)
 
-    # --- Solution space metrics ---
+    # Solution space metrics
     if classical_solutions_bs:
         solution_space = compute_solution_space_metrics(classical_solutions_bs, num_vars)
 
-    # --- Hardware requirements ---
+    # Hardware requirements
     if static_circuit:
         cl_checks = classical_metrics.constraint_checks if classical_metrics else 0
         hw_reqs = estimate_hardware_requirements(static_circuit, cl_checks)
@@ -650,9 +642,7 @@ def benchmark(  # noqa: PLR0915
     )
 
 
-# ---------------------------------------------------------------------------
 # Report printer
-# ---------------------------------------------------------------------------
 
 
 # Formats every report section in sequence — long but linear, waived like

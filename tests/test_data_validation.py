@@ -46,9 +46,7 @@ def _parse_key(key: str) -> tuple[int, tuple[int, ...]]:
     return length, clue
 
 
-# ---------------------------------------------------------------------------
 # 1. Key format validation
-# ---------------------------------------------------------------------------
 
 
 class TestKeyFormat:
@@ -69,9 +67,7 @@ class TestKeyFormat:
                 assert c >= 0, f"Key has negative clue value: {key!r}"
 
 
-# ---------------------------------------------------------------------------
 # 2. Coverage of lengths 1-6
-# ---------------------------------------------------------------------------
 
 
 class TestLengthCoverage:
@@ -83,9 +79,7 @@ class TestLengthCoverage:
         )
 
 
-# ---------------------------------------------------------------------------
 # 3. Every bitstring satisfies its clue
-# ---------------------------------------------------------------------------
 
 
 class TestBitstringSatisfiesClue:
@@ -100,9 +94,7 @@ class TestBitstringSatisfiesClue:
             )
 
 
-# ---------------------------------------------------------------------------
 # 4. No duplicate patterns within a key
-# ---------------------------------------------------------------------------
 
 
 class TestNoDuplicatePatterns:
@@ -114,9 +106,7 @@ class TestNoDuplicatePatterns:
         )
 
 
-# ---------------------------------------------------------------------------
 # 5. Empty clue (0,) for each length has exactly one pattern (all zeros)
-# ---------------------------------------------------------------------------
 
 
 class TestEmptyClue:
@@ -133,9 +123,7 @@ class TestEmptyClue:
         )
 
 
-# ---------------------------------------------------------------------------
 # 6. Full clue (length,) for each length has exactly one pattern (all ones)
-# ---------------------------------------------------------------------------
 
 
 class TestFullClue:
@@ -154,9 +142,7 @@ class TestFullClue:
         )
 
 
-# ---------------------------------------------------------------------------
 # 7. Pattern completeness - no valid pattern is missing
-# ---------------------------------------------------------------------------
 
 
 class TestPatternCompleteness:
@@ -203,9 +189,7 @@ class TestPatternCompleteness:
             )
 
 
-# ---------------------------------------------------------------------------
 # 8. Cross-reference: core.rle() agrees with the data table
-# ---------------------------------------------------------------------------
 
 
 class TestCrossReferenceRle:

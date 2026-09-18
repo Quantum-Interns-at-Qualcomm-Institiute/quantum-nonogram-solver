@@ -97,7 +97,7 @@ def test_hardware_3x3_pipeline():
         grid = bs[::-1]
         print(f"  {bs:<14}  {grid:<14}  {cnt:>6}  {cnt / total:>6.2%}")
 
-    # ── Pipeline assertions ──────────────────────────────────────────────
+    # Pipeline assertions
     # The job ran, returned counts, and the bitstrings are the right length.
     assert total > 0, "No shots returned — job may have failed silently"
     assert all(len(bs) == 9 for bs in counts), (
