@@ -17,7 +17,6 @@ from nonogram.metrics import (
 # Helpers / shared fixtures
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2×2, 4 variables
-SMALL_SOLUTION = "1001"
 
 
 def _make_classical() -> ClassicalMetrics:
