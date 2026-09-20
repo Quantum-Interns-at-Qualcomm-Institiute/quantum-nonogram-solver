@@ -34,7 +34,7 @@ class TestSocketConnection:
 
 
 class TestGridEvents:
-    def test_post_grid_stores_the_grid(self, client):
+    def test_post_grid_records_the_dimensions(self, client):
         grid = [
             [True, True, False],
             [False, True, True],
@@ -45,8 +45,14 @@ class TestGridEvents:
 
         from tools.state import state
 
-        assert state["rows"] == 3
-        assert state["grid"] == grid
+        assert (state["rows"], state["cols"]) == (3, 3)
+
+    def test_post_grid_rejects_a_grid_that_contradicts_the_dimensions(self, client):
+        resp = client.post(
+            "/api/grid", json={"rows": 3, "cols": 3, "grid": [[False, False]]}
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "invalid_grid"
 
     def test_randomize_returns_valid_grid(self, client):
         resp = client.post("/api/randomize", json={"rows": 3, "cols": 3})

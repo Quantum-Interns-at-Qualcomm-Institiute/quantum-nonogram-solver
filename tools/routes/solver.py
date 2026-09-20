@@ -73,7 +73,6 @@ def _build_payload(
     hardware=None,
     row_clues=None,
     col_clues=None,
-    qu_counts_per_trial=None,
 ) -> dict:
     """Build the common payload dict for bench_done events and run persistence."""
     return {
@@ -82,7 +81,6 @@ def _build_payload(
         "report": report_to_dict(report),
         "solutions": solutions,
         "qu_counts": qu_counts,
-        "qu_counts_per_trial": qu_counts_per_trial,
         "rows": rows,
         "cols": cols,
         "trials": trials,
@@ -235,7 +233,6 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
             chart_b64,
             row_clues=row_clues,
             col_clues=col_clues,
-            qu_counts_per_trial=None,
         )
     _save_run(payload)
     return payload

@@ -41,7 +41,6 @@ def api_puzzle_load():
         state["puzzle_name"] = data.get("name", "puzzle") or "puzzle"
         state["rows"] = len(row_clues)
         state["cols"] = len(col_clues)
-        state["grid"] = [[False] * len(col_clues) for _ in range(len(row_clues))]
     return jsonify(
         {
             "name": state["puzzle_name"],

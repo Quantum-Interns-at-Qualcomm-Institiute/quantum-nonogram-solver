@@ -42,7 +42,6 @@ def api_grid():
     with state_lock:
         state["rows"] = rows
         state["cols"] = cols
-        state["grid"] = grid
     return jsonify({"ok": True})
 
 
@@ -57,5 +56,4 @@ def api_randomize():
     with state_lock:
         state["rows"] = rows
         state["cols"] = cols
-        state["grid"] = grid
     return jsonify({"rows": rows, "cols": cols, "grid": grid})

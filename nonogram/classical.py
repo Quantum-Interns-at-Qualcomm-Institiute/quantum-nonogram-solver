@@ -34,35 +34,17 @@ class ExecutionCounts:
     literal_evaluations: int = 0
     """Total individual literal (variable) evaluations."""
 
-    constraint_checks: int = 0
-    """Total constraint checks = clause_evaluations (alias for clarity)."""
-
     early_terminations: int = 0
     """Candidates rejected before evaluating all clauses (short-circuit)."""
 
     solutions_found: int = 0
     """Number of satisfying assignments found."""
 
-    @property
-    def literals_per_candidate(self) -> float:
-        """Average literal evaluations per candidate."""
-        if self.candidates_evaluated == 0:
-            return 0.0
-        return self.literal_evaluations / self.candidates_evaluated
-
-    @property
-    def clauses_per_candidate(self) -> float:
-        """Average clause evaluations per candidate."""
-        if self.candidates_evaluated == 0:
-            return 0.0
-        return self.clause_evaluations / self.candidates_evaluated
-
 
 # One hot loop over candidates x clauses x literals: splitting it would scatter it.
 def classical_solve(  # noqa: C901, PLR0912
     puzzle: tuple[list, list],
     manual_check: str | None = None,
-    verbose: bool = False,
     collect_counts: bool = False,
 ) -> list[str] | tuple[list[str], ExecutionCounts]:
     """Solve a nonogram by exhaustive brute-force search.
@@ -78,8 +60,6 @@ def classical_solve(  # noqa: C901, PLR0912
     manual_check : str, optional
         If provided, evaluate only this single bitstring (e.g., for solution validation)
         instead of searching exhaustively. String should be '0'/'1' characters.
-    verbose : bool, optional
-        If True, print detailed clause and subclause evaluation for debugging.
     collect_counts : bool, optional
         If True, return (solutions, ExecutionCounts) instead of just solutions.
 
@@ -124,18 +104,13 @@ def classical_solve(  # noqa: C901, PLR0912
         for clause in expression:
             if counts is not None:
                 counts.clause_evaluations += 1
-                counts.constraint_checks += 1
 
             clause_value = False
-            if verbose:
-                print(f"Clause: {clause}")
             for subclause in clause:
                 if counts is not None:
                     counts.subclause_evaluations += 1
 
                 subclause_value = True
-                if verbose:
-                    print(f"  Subclause: {subclause}")
                 for literal in subclause:
                     if counts is not None:
                         counts.literal_evaluations += 1
@@ -146,23 +121,12 @@ def classical_solve(  # noqa: C901, PLR0912
                     negated = literal < 0
                     literal_value = not truth_value if negated else truth_value
                     subclause_value &= literal_value
-                    if verbose:
-                        print(
-                            f"    literal={literal} index={index} "
-                            f"config={config_value} truth={truth_value} "
-                            f"negated={negated} value={literal_value} "
-                            f"subclause_so_far={subclause_value}"
-                        )
                 clause_value |= subclause_value
-                if verbose:
-                    print(f"  clause_value: {clause_value}")
             expression_value &= clause_value
             if not expression_value:
                 if counts is not None:
                     counts.early_terminations += 1
                 break
-            if verbose:
-                print(f"expression_value: {expression_value}")
 
         if expression_value:
             solutions.append(configuration)

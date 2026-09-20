@@ -132,7 +132,7 @@ The report carries both solve times, the theoretical and measured speedup, qubit
 }
 ```
 
-`save_puzzle`, `load_puzzle`, `save_batch` and `load_batch` read and write these; the batch pair works on a whole directory.
+`save_puzzle` and `load_puzzle` read and write these.
 
 ## Testing
 

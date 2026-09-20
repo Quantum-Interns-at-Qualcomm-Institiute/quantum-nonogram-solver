@@ -82,7 +82,7 @@ class TestGridStateIntegrity:
         grid = [[True, False], [False, True]]
         resp = client.post("/api/grid", json={"rows": 2, "cols": 2, "grid": grid})
         assert resp.status_code == 200
-        assert app_state.state["grid"] == grid
+        assert (app_state.state["rows"], app_state.state["cols"]) == (2, 2)
 
     def test_randomize_produces_valid_grid(self, client):
         resp = client.post("/api/randomize", json={"rows": 3, "cols": 4})

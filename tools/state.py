@@ -7,12 +7,12 @@ from typing import Any
 
 from flask_socketio import SocketIO
 
-# Server state (single-user local app)
+# Server state (single-operator app). The posted grid is validated but not kept:
+# no route serves it back, and solves take their clues from the request body.
 _DEFAULT_SIZE = 4
 state: dict[str, Any] = {
     "rows": _DEFAULT_SIZE,
     "cols": _DEFAULT_SIZE,
-    "grid": [[False] * _DEFAULT_SIZE for _ in range(_DEFAULT_SIZE)],
     "hw_config": None,
     "busy": False,
     "puzzle_name": "puzzle",

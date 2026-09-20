@@ -7,7 +7,6 @@ name = "nonogram"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.24,<3.0",
     "qiskit>=2.2,<3.0",
     "qiskit-algorithms>=0.3,<1.0",
     "qiskit-ibm-runtime>=0.30,<1.0",
@@ -62,13 +61,11 @@ max-complexity = 10
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S104", "S105", "S110", "S310", "PLR0913", "ARG", "T201", "N806", "RUF012"]
 # print() is the product on these surfaces: the metrics report generator, the
-# verbose-mode solver tracing, the grid display helpers, and the CLI benchmark.
+# grid display helper, and the CLI benchmark.
 # N806: SAT-encoder symbols (AND/OR/VAR/NOT) and layout constants are named as
 # the domain writes them.
 "nonogram/metrics.py" = ["T201", "N806"]
-"nonogram/classical.py" = ["T201"]
 "nonogram/core.py" = ["T201", "N806"]
 "tools/benchmark_comparison.py" = ["T201"]
-# Route signatures mirror the API's parameter surface; slated for a dataclass
-# refactor rather than a threshold bump.
+# One parameter per field of the bench payload these routes assemble.
 "tools/routes/solver.py" = ["PLR0913"]

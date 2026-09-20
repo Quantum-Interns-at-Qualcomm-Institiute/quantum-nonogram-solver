@@ -52,15 +52,7 @@ Usage
 """
 
 from nonogram.classical import ExecutionCounts, classical_solve
-from nonogram.core import (
-    display_nonogram,
-    grid_to_clues,
-    parse_clue,
-    puzzle_to_boolean,
-    rle,
-    validate,
-    var_clauses,
-)
+from nonogram.core import display_nonogram, puzzle_to_boolean, rle, var_clauses
 from nonogram.data import constraint_density, valid_line_configs
 from nonogram.errors import (
     ClassicalSolverError,
@@ -71,7 +63,7 @@ from nonogram.errors import (
     SolverError,
     ValidationError,
 )
-from nonogram.io import load_batch, load_puzzle, save_batch, save_puzzle
+from nonogram.io import load_puzzle, save_puzzle
 from nonogram.metrics import (
     ClassicalMetrics,
     ComparisonReport,
@@ -109,17 +101,12 @@ __all__ = [
     "classical_solve",
     "constraint_density",
     "display_nonogram",
-    "grid_to_clues",
-    "load_batch",
     "load_puzzle",
-    "parse_clue",
     "print_report",
     "puzzle_to_boolean",
     "quantum_solve",
     "rle",
-    "save_batch",
     "save_puzzle",
     "valid_line_configs",
-    "validate",
     "var_clauses",
 ]

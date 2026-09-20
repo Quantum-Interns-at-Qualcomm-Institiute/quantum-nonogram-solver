@@ -37,8 +37,7 @@ class TestQuantumSimulatorSolverInterface:
         solver = QuantumSimulatorSolver()
         puzzle = ([(1,)], [(1,)])
         result = solver.solve(puzzle)
-        assert "counts" in result
-        assert "grover_result" in result
+        assert set(result) == {"counts"}
 
     def test_solve_finds_correct_solution(self):
         solver = QuantumSimulatorSolver()

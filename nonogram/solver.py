@@ -48,7 +48,7 @@ class QuantumSimulatorSolver:
             raise
         except Exception as exc:
             raise QuantumSolverError(str(exc)) from exc
-        return {"counts": counts, "grover_result": result}
+        return {"counts": counts}
 
 
 class QuantumHardwareSolver:

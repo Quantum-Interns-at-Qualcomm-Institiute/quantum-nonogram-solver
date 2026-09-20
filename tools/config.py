@@ -14,8 +14,5 @@ MAX_CONTENT_LENGTH = 256 * 1024  # 256 KB
 # (the UI offers 20; beyond that the extra trials only add sampling noise).
 MAX_TRIALS = 25
 
-PUZZLES_DIR = ROOT / "puzzles"
-PUZZLES_DIR.mkdir(parents=True, exist_ok=True)
-
 RUNS_DIR = ROOT / "runs"
 RUNS_DIR.mkdir(parents=True, exist_ok=True)

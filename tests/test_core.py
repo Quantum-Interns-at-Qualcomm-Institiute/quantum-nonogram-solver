@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from nonogram.core import display_nonogram, puzzle_to_boolean, validate, var_clauses
+from nonogram.core import display_nonogram, puzzle_to_boolean, var_clauses
 
 # var_clauses
 
@@ -41,22 +41,6 @@ class TestVarClauses:
         row_vars_sq, _ = var_clauses(4)
         row_vars_rect, _ = var_clauses(4, 4)
         assert row_vars_sq == row_vars_rect
-
-
-# validate
-
-
-class TestValidate:
-    def test_valid_input(self):
-        assert validate(2, 3, [(1,), (1,)], [(1,), (1,), (1,)]) is True
-
-    def test_wrong_row_clue_count(self):
-        with pytest.raises(ValueError, match="row clues"):
-            validate(3, 2, [(1,), (1,)], [(1,), (1,)])
-
-    def test_wrong_col_clue_count(self):
-        with pytest.raises(ValueError, match="col clues"):
-            validate(2, 3, [(1,), (1,)], [(1,), (1,)])
 
 
 # display_nonogram

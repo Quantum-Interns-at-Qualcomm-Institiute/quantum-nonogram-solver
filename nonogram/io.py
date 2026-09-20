@@ -19,7 +19,7 @@ Schema::
 
 Usage::
 
-    from nonogram.io import save_puzzle, load_puzzle, save_batch, load_batch
+    from nonogram.io import save_puzzle, load_puzzle
 
     # Save one puzzle
     save_puzzle([[1,1],[2,2]], [[4],[1],[1]], "my_puzzle.non.json", name="Demo")
@@ -28,10 +28,6 @@ Usage::
     data = load_puzzle("my_puzzle.non.json")
     row_clues = [tuple(r) for r in data["row_clues"]]
     col_clues  = [tuple(c) for c in data["col_clues"]]
-
-    # Batch helpers
-    save_batch(list_of_dicts, folder="puzzles/")
-    puzzles = load_batch("puzzles/")
 """
 
 from __future__ import annotations
@@ -44,7 +40,7 @@ from typing import Any
 
 from nonogram.errors import PuzzleIOError, ValidationError
 
-__all__ = ["load_batch", "load_puzzle", "save_batch", "save_puzzle"]
+__all__ = ["load_puzzle", "save_puzzle"]
 
 _MAX_LINE = 10  # the largest grid side the lookup tables cover
 
@@ -188,46 +184,3 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
     data["rows"] = len(data["row_clues"])
     data["cols"] = len(data["col_clues"])
     return data
-
-
-def save_batch(
-    puzzles: list[dict[str, Any]],
-    folder: str | Path,
-) -> list[Path]:
-    """Write a list of puzzle dicts to *folder*, one file each.
-
-    Each dict must contain ``row_clues``, ``col_clues``, and optionally
-    ``name`` and ``tags`` (all other keys are ignored / recomputed).
-
-    Files are named ``{slug}_{idx:03d}.non.json``.  Returns the list of
-    written file paths.
-    """
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
-    for idx, pz in enumerate(puzzles):
-        name = pz.get("name", f"puzzle_{idx:03d}")
-        slug = _slugify(name)
-        dest = folder / f"{slug}_{idx:03d}.non.json"
-        save_puzzle(
-            row_clues=pz["row_clues"],
-            col_clues=pz["col_clues"],
-            path=dest,
-            name=name,
-            tags=pz.get("tags"),
-        )
-        written.append(dest)
-    return written
-
-
-def load_batch(folder: str | Path) -> list[dict[str, Any]]:
-    """Load all ``.non.json`` files from *folder* and return a sorted list of
-    puzzle dicts (sorted by filename for reproducibility).
-
-    Each item is the same dict structure returned by :func:`load_puzzle`.
-    """
-    folder = Path(folder)
-    if not folder.is_dir():
-        raise PuzzleIOError(f"Batch folder not found: {folder}")
-    files = sorted(folder.glob("*.non.json"))
-    return [load_puzzle(f) for f in files]

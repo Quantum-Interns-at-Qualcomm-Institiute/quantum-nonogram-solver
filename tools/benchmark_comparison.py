@@ -99,7 +99,6 @@ def run_comparison(
                 "clause_evaluations": report.classical.clause_evaluations,
                 "subclause_evaluations": report.classical.subclause_evaluations,
                 "literal_evaluations": report.classical.literal_evaluations,
-                "constraint_checks": report.classical.constraint_checks,
                 "early_terminations": report.classical.early_terminations,
                 "solutions_found": report.classical.solutions_found,
             }
@@ -149,7 +148,7 @@ def run_comparison(
     for entry in results:
         n_vars = entry["num_variables"]
         ss = entry["search_space"]
-        cl_checks = entry.get("classical", {}).get("constraint_checks", "N/A")
+        cl_checks = entry.get("classical", {}).get("clause_evaluations", "N/A")
         gr_iters = entry.get("quantum_static", {}).get("grover_iterations", "N/A")
         theoretical = f"sqrt({ss})"
 

@@ -21,7 +21,6 @@ class TestBenchmarkWithExecutionCounts:
         assert result.classical is not None
         assert result.classical.clause_evaluations > 0
         assert result.classical.literal_evaluations > 0
-        assert result.classical.constraint_checks > 0
 
     def test_early_terminations_tracked(self):
         result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)

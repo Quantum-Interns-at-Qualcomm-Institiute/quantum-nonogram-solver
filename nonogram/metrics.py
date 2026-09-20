@@ -51,9 +51,6 @@ class ClassicalMetrics:
     literal_evaluations: int = 0
     """Total individual literal evaluations."""
 
-    constraint_checks: int = 0
-    """Total constraint checks (alias for clause_evaluations)."""
-
     early_terminations: int = 0
     """Candidates rejected before evaluating all clauses."""
 
@@ -538,7 +535,6 @@ def benchmark(  # noqa: PLR0915
             clause_evaluations=exec_counts.clause_evaluations,
             subclause_evaluations=exec_counts.subclause_evaluations,
             literal_evaluations=exec_counts.literal_evaluations,
-            constraint_checks=exec_counts.constraint_checks,
             early_terminations=exec_counts.early_terminations,
         )
 
@@ -620,7 +616,7 @@ def benchmark(  # noqa: PLR0915
 
     # Hardware requirements
     if static_circuit:
-        cl_checks = classical_metrics.constraint_checks if classical_metrics else 0
+        cl_checks = classical_metrics.clause_evaluations if classical_metrics else 0
         hw_reqs = estimate_hardware_requirements(static_circuit, cl_checks)
 
     return ComparisonReport(
@@ -777,14 +773,10 @@ def print_report(report: ComparisonReport) -> None:  # noqa: C901, PLR0915
         print(row("Oracle call reduction", "", f"{reduction:.1f}%"))
 
         # Execution count comparison
-        if c.constraint_checks > 0:
-            print(row("Classical constraint checks", f"{c.constraint_checks:,}", ""))
+        if c.clause_evaluations > 0:
+            print(row("Classical constraint checks", f"{c.clause_evaluations:,}", ""))
             print(row("Quantum oracle calls", "", f"{grover_oracle:,}"))
-            check_reduction = (
-                (1 - grover_oracle / c.constraint_checks) * 100
-                if c.constraint_checks
-                else 0
-            )
+            check_reduction = (1 - grover_oracle / c.clause_evaluations) * 100
             print(row("Constraint check reduction", "", f"{check_reduction:.1f}%"))
 
     print(f"\n{'═' * 64}\n")
