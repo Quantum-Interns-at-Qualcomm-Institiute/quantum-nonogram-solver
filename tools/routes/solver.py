@@ -29,6 +29,19 @@ from tools.state import emit_status, set_busy, state, state_lock
 
 bp = Blueprint("solver", __name__)
 
+# Boolean synthesis recurses deep enough to run a worker thread off the end of its
+# default C stack, which kills the process with SIGSEGV.
+_WORKER_STACK_BYTES = 32 * 1024 * 1024
+
+
+def _start_worker(target) -> None:
+    """Run *target* on a daemon thread sized for circuit synthesis."""
+    previous = threading.stack_size(_WORKER_STACK_BYTES)
+    try:
+        threading.Thread(target=target, daemon=True).start()
+    finally:
+        threading.stack_size(previous)
+
 
 def _sanitize_error(exc: Exception) -> str:
     """Strip potential credentials from error messages."""
@@ -335,7 +348,7 @@ def api_solve_classical():
         finally:
             set_busy(False)
 
-    threading.Thread(target=_work, daemon=True).start()
+    _start_worker(_work)
     return jsonify({"ok": True})
 
 
@@ -383,7 +396,7 @@ def api_solve_quantum():
         finally:
             set_busy(False)
 
-    threading.Thread(target=_work, daemon=True).start()
+    _start_worker(_work)
     return jsonify({"ok": True})
 
 
@@ -428,7 +441,7 @@ def api_benchmark():
         finally:
             set_busy(False)
 
-    threading.Thread(target=_work, daemon=True).start()
+    _start_worker(_work)
     return jsonify({"ok": True})
 
 
