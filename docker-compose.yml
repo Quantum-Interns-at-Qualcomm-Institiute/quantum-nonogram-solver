@@ -3,8 +3,8 @@ services:
     container_name: nonogram
     build: .
     ports:
-      - "127.0.0.1:${NONOGRAM_PORT}:${NONOGRAM_PORT}"
+      - "127.0.0.1:${NONOGRAM_PORT:-8080}:${NONOGRAM_PORT:-8080}"
     environment:
-      PORT: "${NONOGRAM_PORT}"
-      DEV_CERT_DIR: ""
-      NONOGRAM_HOST: "0.0.0.0"
+      PORT: "${NONOGRAM_PORT:-8080}"
+      ORIGIN_SECRET: "${ORIGIN_SECRET:-}"
+      NONOGRAM_ALLOW_INSECURE: "${NONOGRAM_ALLOW_INSECURE:-1}"

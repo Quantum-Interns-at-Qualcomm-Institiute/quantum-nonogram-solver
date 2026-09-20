@@ -22,6 +22,9 @@ from pathlib import Path
 from nonogram.metrics import benchmark, print_report
 
 # Puzzles of increasing size with known solutions for benchmarking.
+# The solve cap the web API enforces, so the CLI and the service agree.
+_MAX_VARIABLES = 20
+
 BENCHMARK_PUZZLES: dict[str, tuple[list, list]] = {
     "1x1": ([(1,)], [(1,)]),
     "2x2": ([(1,), (1,)], [(1,), (1,)]),
@@ -33,6 +36,66 @@ BENCHMARK_PUZZLES: dict[str, tuple[list, list]] = {
         [(1,), (2,), (1, 1), (2,), (1, 1)],
     ),
 }
+
+
+def _entry_for(name: str, n: int, d: int, report) -> dict:
+    """Flatten one report into the JSON row the scaling table and --json share."""
+    num_vars = n * d
+    search_space = 2**num_vars
+    # Collect structured data
+    entry: dict = {
+        "name": name,
+        "rows": n,
+        "cols": d,
+        "num_variables": num_vars,
+        "search_space": search_space,
+        "theoretical_grover_speedup": math.sqrt(search_space),
+    }
+
+    if report.classical:
+        entry["classical"] = {
+            "solve_time_s": report.classical.solve_time_s,
+            "configurations_evaluated": report.classical.configurations_evaluated,
+            "clause_evaluations": report.classical.clause_evaluations,
+            "subclause_evaluations": report.classical.subclause_evaluations,
+            "literal_evaluations": report.classical.literal_evaluations,
+            "early_terminations": report.classical.early_terminations,
+            "solutions_found": report.classical.solutions_found,
+        }
+
+    if report.static_circuit:
+        sc = report.static_circuit
+        entry["quantum_static"] = {
+            "num_qubits": sc.num_qubits,
+            "circuit_depth": sc.circuit_depth,
+            "total_gate_count": sc.total_gate_count,
+            "two_qubit_gate_count": sc.two_qubit_gate_count,
+            "two_qubit_gate_density": sc.two_qubit_gate_density,
+            "grover_iterations": sc.grover_iterations,
+            "depth_per_iteration": sc.depth_per_iteration,
+            "gates_per_qubit": sc.gates_per_qubit,
+        }
+
+    if report.quantum:
+        entry["quantum_simulated"] = {
+            "solve_time_s": report.quantum.solve_time_s,
+            "grover_iterations": report.quantum.grover_iterations,
+            "oracle_correct": report.quantum.oracle_evaluation_correct,
+            "top_probability": report.quantum.top_result_probability,
+            "solutions_found": report.quantum.solutions_found,
+        }
+
+    if report.constraint_density_metrics:
+        entry["constraint_density"] = report.constraint_density_metrics
+
+    if report.classical and report.quantum:
+        entry["comparison"] = {
+            "actual_speedup": report.actual_speedup,
+            "theoretical_speedup": report.theoretical_grover_speedup,
+            "advantage_ratio": report.quantum_advantage_ratio,
+        }
+
+    return entry
 
 
 def run_comparison(
@@ -71,70 +134,24 @@ def run_comparison(
         print(f"  Search space: {search_space:,} configurations")
         print(f"{'=' * 60}")
 
-        # Full benchmark with all features
+        # Both solvers are exponential in grid area, so the same cap applies to
+        # each: above it the run stops being a benchmark and becomes a hang.
+        tractable = num_vars <= _MAX_VARIABLES
+        if not tractable:
+            print(f"  Skipping: {num_vars} variables is above the {_MAX_VARIABLES}-variable cap")
+            continue
+
         report = benchmark(
             puzzle,
             run_classical=True,
-            run_quantum=run_quantum and num_vars <= 20,
+            run_quantum=run_quantum,
             static_analysis=run_quantum,
             compute_constraint_density=True,
         )
 
         print_report(report)
 
-        # Collect structured data
-        entry = {
-            "name": name,
-            "rows": n,
-            "cols": d,
-            "num_variables": num_vars,
-            "search_space": search_space,
-            "theoretical_grover_speedup": math.sqrt(search_space),
-        }
-
-        if report.classical:
-            entry["classical"] = {
-                "solve_time_s": report.classical.solve_time_s,
-                "configurations_evaluated": report.classical.configurations_evaluated,
-                "clause_evaluations": report.classical.clause_evaluations,
-                "subclause_evaluations": report.classical.subclause_evaluations,
-                "literal_evaluations": report.classical.literal_evaluations,
-                "early_terminations": report.classical.early_terminations,
-                "solutions_found": report.classical.solutions_found,
-            }
-
-        if report.static_circuit:
-            sc = report.static_circuit
-            entry["quantum_static"] = {
-                "num_qubits": sc.num_qubits,
-                "circuit_depth": sc.circuit_depth,
-                "total_gate_count": sc.total_gate_count,
-                "two_qubit_gate_count": sc.two_qubit_gate_count,
-                "two_qubit_gate_density": sc.two_qubit_gate_density,
-                "grover_iterations": sc.grover_iterations,
-                "depth_per_iteration": sc.depth_per_iteration,
-                "gates_per_qubit": sc.gates_per_qubit,
-            }
-
-        if report.quantum:
-            entry["quantum_simulated"] = {
-                "solve_time_s": report.quantum.solve_time_s,
-                "grover_iterations": report.quantum.grover_iterations,
-                "oracle_correct": report.quantum.oracle_evaluation_correct,
-                "top_probability": report.quantum.top_result_probability,
-                "solutions_found": report.quantum.solutions_found,
-            }
-
-        if report.constraint_density_metrics:
-            entry["constraint_density"] = report.constraint_density_metrics
-
-        if report.classical and report.quantum:
-            entry["comparison"] = {
-                "actual_speedup": report.actual_speedup,
-                "theoretical_speedup": report.theoretical_grover_speedup,
-                "advantage_ratio": report.quantum_advantage_ratio,
-            }
-
+        entry = _entry_for(name, n, d, report)
         results.append(entry)
 
     # Print scaling summary

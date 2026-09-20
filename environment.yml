@@ -8,11 +8,6 @@ dependencies:
   - jupyterlab
   - pip
   - pip:
-    - qiskit>=2.2
-    - qiskit-algorithms
-    - flask
-    - flask-socketio
-    - numpy
-    - matplotlib
-    - scipy
-    - -e ".[dev]" # installs the nonogram package (editable) + pytest/ruff dev tools
+    # the package pulls its own dependencies from pyproject.toml; listing them
+    # again here only lets the two drift apart
+    - -e ".[dev]"

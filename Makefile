@@ -22,7 +22,7 @@ RUFF         = $(ENV_PREFIX)/bin/ruff
 KERNEL_NAME  = quantum-nonogram
 KERNEL_LABEL = Quantum Nonogram (Python 3.11)
 
-.PHONY: help env install kernel lab app test test-hardware lint clean
+.PHONY: help env install kernel lab app test test-hardware bench lock lint clean
 
 # ── help ──────────────────────────────────────────────────────────────────────
 help:
@@ -34,6 +34,8 @@ help:
 	@echo "  make app      Launch the web app (Flask)"
 	@echo "  make test     Run pytest (hardware tests deselected)"
 	@echo "  make test-hardware  Run the IBM hardware tests (spends credits)"
+	@echo "  make bench    Run the Grover vs brute-force comparison"
+	@echo "  make lock     Regenerate requirements.lock (needs Docker)"
 	@echo "  make lint     Run ruff over the whole repo"
 	@echo "  make clean    Remove __pycache__ and .pytest_cache"
 	@echo ""
@@ -84,6 +86,17 @@ test:
 
 test-hardware:
 	$(PYTEST) tests/ -v -s -m hardware
+
+# ── bench ─────────────────────────────────────────────────────────────────────
+bench:
+	$(PYTHON) tools/benchmark_comparison.py
+
+# ── lock ──────────────────────────────────────────────────────────────────────
+# Runs in the image the Dockerfile builds from, so the pins match that platform.
+lock:
+	docker run --rm -v "$(CURDIR)":/src -w /src python:3.12-slim \
+	  sh -c 'pip install --quiet . && pip freeze --exclude-editable | grep -v "^nonogram" > requirements.lock'
+	@echo "✓ requirements.lock regenerated."
 
 # ── lint ──────────────────────────────────────────────────────────────────────
 lint:

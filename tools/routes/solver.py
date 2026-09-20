@@ -171,11 +171,14 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
 
         from nonogram.quantum import quantum_solve_hardware
 
-        cl_times: list[float] = []
-        for _ in range(trials):
-            rpt = benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
-            if rpt.classical:
-                cl_times.append(rpt.classical.solve_time_s)
+        # Keep the last trial's report: re-running the benchmark for one would be
+        # another full exhaustive solve.
+        reports = [
+            benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
+            for _ in range(trials)
+        ]
+        cl_times: list[float] = [r.classical.solve_time_s for r in reports if r.classical]
+        report = reports[-1]
         t0 = time.perf_counter()
         hw_counts, backend_name = quantum_solve_hardware(
             (row_clues, col_clues),
@@ -185,7 +188,6 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
             shots=hw_cfg["shots"],
         )
         qu_times = [time.perf_counter() - t0]
-        report = benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
         solutions = classical_solve((row_clues, col_clues))
         chart_b64 = render_chart_b64(report, cl_times, qu_times)
         payload = _build_payload(

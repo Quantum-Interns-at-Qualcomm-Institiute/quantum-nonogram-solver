@@ -95,7 +95,6 @@ def report_to_dict(report: Any) -> dict:
         "hardware_requirements": {
             "estimated_coherence_us": hw.estimated_coherence_us,
             "max_gate_error_rate": hw.max_gate_error_rate,
-            "break_even_search_space": hw.break_even_search_space,
         }
         if hw
         else None,

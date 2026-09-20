@@ -4,7 +4,7 @@ These tests validate the integrated benchmark pipeline including execution count
 static circuit analysis, and constraint density metrics.
 """
 
-
+import json
 
 from nonogram.metrics import (
     StaticCircuitAnalysis,
@@ -128,3 +128,25 @@ class TestFullBenchmarkPipeline:
         assert "Static Circuit Analysis" in output
         assert "Constraint Density" in output
         assert "Clause evaluations" in output
+
+
+class TestBenchmarkCLI:
+    """tools/benchmark_comparison.py is a CLI nothing imports, so it needs a smoke test."""
+
+    def test_small_run_produces_rows(self, capsys, tmp_path):
+        from tools.benchmark_comparison import run_comparison
+
+        out = tmp_path / "results.json"
+        results = run_comparison(max_size=2, run_quantum=False, output_json=str(out))
+
+        assert [r["name"] for r in results] == ["1x1", "2x2"]
+        assert results[-1]["classical"]["configurations_evaluated"] == 16
+        assert json.loads(out.read_text()) == json.loads(json.dumps(results, default=str))
+        assert "SCALING SUMMARY" in capsys.readouterr().out
+
+    def test_intractable_sizes_are_skipped(self, capsys):
+        from tools.benchmark_comparison import _MAX_VARIABLES, run_comparison
+
+        results = run_comparison(max_size=5, run_quantum=False)
+        assert all(r["num_variables"] <= _MAX_VARIABLES for r in results)
+        assert "above the" in capsys.readouterr().out

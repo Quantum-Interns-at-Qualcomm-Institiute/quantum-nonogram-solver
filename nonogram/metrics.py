@@ -251,9 +251,6 @@ class HardwareRequirements:
     max_gate_error_rate: float = field(init=False)
     """Rough upper bound on tolerable per-gate error rate (1/total_gates)."""
 
-    break_even_search_space: int = 0
-    """Search space size where quantum oracle calls < classical constraint checks."""
-
     def __post_init__(self) -> None:
         gate_time_ns = 50  # typical single-gate time on superconducting hardware
         self.estimated_coherence_us = self.circuit_depth * gate_time_ns / 1000
@@ -401,22 +398,11 @@ def compute_solution_space_metrics(
     )
 
 
-def estimate_hardware_requirements(
-    static: StaticCircuitAnalysis,
-    classical_constraint_checks: int = 0,
-) -> HardwareRequirements:
+def estimate_hardware_requirements(static: StaticCircuitAnalysis) -> HardwareRequirements:
     """Estimate hardware requirements from static circuit analysis."""
-    # Break-even: find N where sqrt(N) iterations < classical constraint checks
-    break_even = 0
-    if classical_constraint_checks > 0 and static.grover_iterations > 0:
-        # Grover oracle calls scale as sqrt(N); classical as N
-        # Break-even when sqrt(N) = classical_checks → N = classical_checks^2
-        break_even = classical_constraint_checks ** 2
-
     return HardwareRequirements(
         circuit_depth=static.circuit_depth,
         total_gate_count=static.total_gate_count,
-        break_even_search_space=break_even,
     )
 
 
@@ -615,8 +601,7 @@ def benchmark(  # noqa: PLR0915
 
     # Hardware requirements
     if static_circuit:
-        cl_checks = classical_metrics.clause_evaluations if classical_metrics else 0
-        hw_reqs = estimate_hardware_requirements(static_circuit, cl_checks)
+        hw_reqs = estimate_hardware_requirements(static_circuit)
 
     return ComparisonReport(
         rows=n,
