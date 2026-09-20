@@ -488,9 +488,8 @@ def benchmark(  # noqa: PLR0915
 
     Warning:
         The classical solver is O(2^(n*d)).  For the 4×6 demo puzzle (24
-        variables) it takes ~18 minutes.  Use ``run_classical=False`` and
-        supply ``classical_override`` if you already have timing data, or
-        choose a smaller puzzle for interactive benchmarking.
+        variables) it takes ~18 minutes.  Pass ``run_classical=False`` or choose a
+        smaller puzzle for interactive benchmarking.
     """
     row_clues, col_clues = puzzle
     n, d = len(row_clues), len(col_clues)

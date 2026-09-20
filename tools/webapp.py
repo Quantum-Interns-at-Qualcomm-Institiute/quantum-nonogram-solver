@@ -1,44 +1,35 @@
 """
-Flask + Socket.IO web interface for interactive nonogram solving.
+Flask + Socket.IO JSON API for nonogram solving.
 
-**Features:**
-
-  - Real-time grid editing with mouse drawing
-  - Classical and quantum solver backends
-  - Benchmark comparison with visualization
-  - Puzzle save/load via JSON
-  - IBM quantum hardware integration (with API token)
-  - Live metrics and circuit analysis
+There is no frontend here. The browser UI lives in the website repo and talks to
+this service over the endpoints below; ``GET /api`` lists all of them.
 
 **Usage:**
 
   Run from the project root::
 
-    python tools/webapp.py
-
-  The browser opens automatically at the assigned port.
+    NONOGRAM_ALLOW_INSECURE=1 python tools/webapp.py
 
 **Architecture:**
 
-  - **Frontend**: HTML5 canvas grid, responsive UI, Socket.IO client
-  - **Backend**: Flask server, threaded solver workers, real-time metric updates
-  - **State**: Single-OPERATOR state managed with thread safety — the grid,
-    busy flag, and hardware toggle are one shared set per process, guarded
-    upstream by the front-door origin secret. Solver results/status are
-    scoped to the requesting client's Socket.IO sid when the request carries
+  - **Compute**: threaded solver workers; each result is emitted over Socket.IO and
+    is also available synchronously from the matching ``/sync`` route.
+  - **State**: one shared set per process — dimensions, busy flag and hardware
+    toggle — guarded upstream by the front-door origin secret. Results and status
+    are scoped to the requesting client's Socket.IO sid when the request carries
     one; concurrent operators are not a supported mode.
   - **Modules**:
     - ``tools/state.py``   — server state and Socket.IO helpers
     - ``tools/chart.py``   — chart rendering and report serialization
-    - ``tools/routes/``    — route blueprints (grid, solver, puzzle, hardware, runs)
+    - ``tools/routes/``    — route blueprints (grid, solver, puzzle, hardware, runs, meta)
 
-**Ports & Configuration:**
+**Configuration:**
 
-  - HTTP: dynamically assigned (or set via PORT env var)
-  - WebSocket: Socket.IO over HTTP (CORS restricted to localhost by default)
-  - Puzzle storage: ./puzzles/ directory (auto-created)
-  - Max grid size: 6x6 (limited by data.py lookup table)
+  - HTTP port: 8080, or the PORT env var
+  - CORS: localhost and https://andypeterson.dev, or the NONOGRAM_CORS_ORIGINS list
+  - Max grid size: 10x10 (the reach of the data.py lookup table)
   - Max clues per line: 3 blocks
+  - Max cells per solve: 20 (both solvers are exponential in grid area)
 """
 
 from __future__ import annotations
@@ -47,8 +38,6 @@ import hmac
 import os
 import re
 import sys
-import threading
-import webbrowser
 from pathlib import Path
 
 # path setup
@@ -167,20 +156,15 @@ def _get_ssl_context():
     return None
 
 
-def _find_port(host="127.0.0.1"):
-    import socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind((host, 0))
-        return s.getsockname()[1]
+_DEFAULT_PORT = 8080
 
 
 if __name__ == "__main__":
     HOST = os.environ.get("NONOGRAM_HOST", "127.0.0.1")
-    PORT = int(os.environ.get("PORT") or 0) or _find_port(HOST)
+    PORT = int(os.environ.get("PORT") or _DEFAULT_PORT)
     ssl_ctx = _get_ssl_context()
     scheme = "https" if ssl_ctx else "http"
-    threading.Timer(1.2, lambda: webbrowser.open(f"{scheme}://localhost:{PORT}")).start()
-    print(f"Starting Nonogram web app \u2192 {scheme}://localhost:{PORT}")  # noqa: T201 \u2014 startup banner
+    print(f"Nonogram API on {scheme}://localhost:{PORT} \u2014 GET /api lists the endpoints")  # noqa: T201 \u2014 startup banner
     socketio.run(
         app, host=HOST, port=PORT, debug=False, ssl_context=ssl_ctx,
         allow_unsafe_werkzeug=True,

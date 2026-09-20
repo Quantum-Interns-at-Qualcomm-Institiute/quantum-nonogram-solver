@@ -7,7 +7,7 @@ import io
 import statistics
 from typing import Any
 
-# Chart colours (match tools/static/style.css CSS custom properties)
+# Chart colours, matching the palette the website frontend uses
 BG_CARD = "#ffffff"
 BTN_CL = "#27ae60"
 BTN_QU = "#8e44ad"

@@ -1,9 +1,4 @@
-"""Tests for nonogram.metrics.
-
-The quantum solver requires qiskit + tweedledum, so quantum-path tests are
-guarded with a skipif marker.  All structural / math tests run without any
-quantum dependencies.
-"""
+"""Tests for nonogram.metrics: the dataclasses, the benchmark runner and the report."""
 
 import io
 import math

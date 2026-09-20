@@ -22,7 +22,7 @@ def load_ibm_token() -> str | None:
 
     Checks (in order):
       1. ``IBM_QUANTUM_TOKEN`` environment variable
-      2. ``KEY=<token>`` in the project-root ``.env`` file
+      2. ``IBM_QUANTUM_TOKEN=<token>`` in the project-root ``.env`` file
 
     Returns *None* when neither source provides a token — callers
     typically use this with ``pytest.mark.skipif`` to skip hardware tests

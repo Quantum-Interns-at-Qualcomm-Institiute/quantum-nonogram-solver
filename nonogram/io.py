@@ -62,13 +62,18 @@ def _check_block_lengths(clues: list, label: str) -> None:
                 )
 
 
-def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
+def _validate_clues(
+    row_clues: list, col_clues: list, max_cells=None, max_blocks=None
+) -> None:
     """Raise ValidationError if clues are obviously malformed.
 
     When ``max_cells`` is given, also reject puzzles whose grid AREA
     (len(row_clues) * len(col_clues)) exceeds it — a solve-time DoS guard the web
     solve/benchmark routes pass (both solvers are exponential in area). Library
     save/load omits it, so any size up to the per-line cap can still be stored.
+
+    ``max_blocks`` caps the blocks in one clue, which is the limit the API reports
+    through /api/config; the routes that advertise it pass it here.
     """
     if not row_clues or not col_clues:
         raise ValidationError(
@@ -82,6 +87,13 @@ def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
             f"Puzzle exceeds maximum supported size ({_MAX_LINE}×{_MAX_LINE}). "
             f"Got {len(row_clues)}×{len(col_clues)}."
         )
+    if max_blocks is not None:
+        for label, clues in (("row_clues", row_clues), ("col_clues", col_clues)):
+            for i, clue in enumerate(clues):
+                if len(clue) > max_blocks:
+                    raise ValidationError(
+                        f"{label}[{i}] has {len(clue)} blocks, above the {max_blocks}-block limit."
+                    )
     if max_cells is not None:
         cells = len(row_clues) * len(col_clues)
         if cells > max_cells:

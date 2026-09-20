@@ -23,7 +23,7 @@ from flask import Blueprint, jsonify, request
 
 from nonogram.errors import ValidationError
 from tools.chart import render_chart_b64, report_to_dict
-from tools.config import MAX_TRIALS, RUNS_DIR
+from tools.config import MAX_CLUES, MAX_TRIALS, RUNS_DIR
 from tools.errors import json_object, require_int, respond_error
 from tools.state import emit_status, set_busy, state, state_lock
 
@@ -271,7 +271,7 @@ def _parse_validated_clues():
 
     try:
         row_clues, col_clues, rows, cols = _parse_clues(json_object(data))
-        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS)
+        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS, max_blocks=MAX_CLUES)
     except ValueError as exc:
         return None, None, None, None, respond_error("invalid_clues", str(exc), 400)
     return row_clues, col_clues, rows, cols, None

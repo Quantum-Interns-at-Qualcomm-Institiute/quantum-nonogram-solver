@@ -2,7 +2,7 @@
 
 Each test module points ``<SERVICE>_URL`` at a running backend (or uses the
 default localhost port) and validates real HTTP responses against the JSON
-Schemas in ``docs/api-contract/schemas/``. Tests auto-skip when the service is
+Schemas in ``tests/contract/schemas/``. Tests auto-skip when the service is
 unreachable, so the suite is safe to run with only some backends up.
 
 Requires ``jsonschema`` — the suite skips entirely if it is not installed.

@@ -217,3 +217,37 @@ class TestSanitizedErrors:
 
     def test_truncated(self):
         assert len(_sanitize_error(Exception("x" * 10_000))) <= 500
+
+
+class TestMaxCluesIsEnforced:
+    """/api/config advertises a block limit per clue; the solve routes hold it."""
+
+    @pytest.fixture
+    def client(self):
+        from tools.webapp import app
+
+        return app.test_client()
+
+    def test_config_reports_the_limit(self, client):
+        from tools.config import MAX_CLUES
+
+        assert client.get("/api/config").get_json()["max_clues"] == MAX_CLUES
+
+    @pytest.mark.parametrize(
+        "path", ["/api/solve/classical", "/api/solve/quantum", "/api/benchmark"]
+    )
+    def test_too_many_blocks_is_400(self, client, path):
+        from tools.config import MAX_CLUES
+
+        clue = [1] * (MAX_CLUES + 1)
+        body = {"row_clues": [clue], "col_clues": [[1]] * (2 * len(clue) - 1)}
+        resp = client.post(path, json=body)
+        assert resp.status_code == 400
+        assert "block" in resp.get_json()["error"]["message"]
+
+    def test_the_limit_itself_is_accepted(self, client):
+        from tools.config import MAX_CLUES
+
+        clue = [1] * MAX_CLUES
+        body = {"row_clues": [clue], "col_clues": [[1]] * (2 * len(clue) - 1)}
+        assert client.post("/api/solve/classical/sync", json=body).status_code == 200

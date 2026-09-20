@@ -13,7 +13,7 @@ Two execution paths are provided:
       Requires:  pip install qiskit-ibm-runtime
 
   list_backends(token, channel)
-      Helper used by the GUI settings dialog to enumerate available backends.
+      Enumerates the backends the account can reach, shortest queue first.
 
 Bitstring note
 --------------
@@ -83,10 +83,10 @@ def quantum_solve_hardware(  # noqa: PLR0913
 
     A few reference values for n = 9 (3 × 3 grid, 1 solution / 512 states):
 
-        k = 1 → P ≈  1.8 %   (barely above random ≈ 0.2 %)
+        k = 1 → P ≈  1.7 %   (barely above random ≈ 0.2 %)
         k = 3 → P ≈  9.3 %   ✓ passes the > 5 % hardware threshold
-        k = 5 → P ≈ 22.6 %
-        k = 9 → P ≈ 64.2 %
+        k = 5 → P ≈ 21.8 %
+        k = 9 → P ≈ 55.4 %
 
     More iterations amplify the signal but also deepen the circuit, making
     hardware noise worse.  ``iterations=3`` is a reasonable default for 9-qubit
@@ -114,8 +114,7 @@ def quantum_solve_hardware(  # noqa: PLR0913
 
     Returns:
         ``(counts_dict, backend_name)`` where *counts_dict* maps bitstring →
-        count, exactly as you'd pass to the GUI's ``_on_hw_qu_done``.
-        Reverse each bitstring key (``bs[::-1]``) to get the row-major grid.
+        count. Reverse each bitstring key (``bs[::-1]``) to get the row-major grid.
 
     Raises:
         ImportError:  if ``qiskit-ibm-runtime`` is not installed.
