@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 
 from nonogram.errors import ValidationError
-from tools.chart import render_chart_b64, report_to_dict
+from tools.chart import measurement_rows, render_chart_b64, render_histogram_b64, report_to_dict
 from tools.config import MAX_CLUES, MAX_TRIALS, RUNS_DIR
 from tools.errors import json_object, require_int, respond_error
 from tools.state import emit_status, set_busy, state, state_lock
@@ -81,6 +81,7 @@ def _build_payload(
         "report": report_to_dict(report),
         "solutions": solutions,
         "qu_counts": qu_counts,
+        "qu_outcomes": measurement_rows(qu_counts) if qu_counts else [],
         "rows": rows,
         "cols": cols,
         "trials": trials,
@@ -243,6 +244,24 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
 # Shared request preamble for the synchronous routes
 
 
+def _quantum_payload(counts: dict, rows: int, cols: int, data: dict) -> dict:
+    """The quantum result the clients read: counts, ranked rows, and a chart on request.
+
+    ``outcomes`` is the distribution already ranked and reversed into row-major
+    order, so a caller charts it without re-deriving anything. ``{"chart": true}``
+    adds a rendered PNG for callers that would rather not draw it themselves.
+    """
+    payload = {
+        "counts": counts,
+        "rows": rows,
+        "cols": cols,
+        "outcomes": measurement_rows(counts),
+    }
+    if data.get("chart"):
+        payload["chart_img"] = render_histogram_b64(counts)
+    return payload
+
+
 def _trials(data: dict) -> int:
     """The requested trial count, clamped to MAX_TRIALS."""
     return min(MAX_TRIALS, max(1, require_int(data, "trials", 1)))
@@ -344,7 +363,7 @@ def api_solve_quantum():
 
             result = solver.solve((row_clues, col_clues))
             counts = result["counts"]
-            socketio.emit("qu_done", {"counts": counts, "rows": rows, "cols": cols}, to=to)
+            socketio.emit("qu_done", _quantum_payload(counts, rows, cols, data), to=to)
             if "backend_name" in result:
                 emit_status(f"{solver.name} complete.", "ok", to=to)
             else:
@@ -447,7 +466,7 @@ def api_solve_quantum_sync():
         if err is not None:
             return err
         result = _get_quantum_solver().solve((row_clues, col_clues))
-        return jsonify({"counts": result["counts"], "rows": rows, "cols": cols})
+        return jsonify(_quantum_payload(result["counts"], rows, cols, request.json))
     except Exception as exc:
         return respond_error("solve_error", _sanitize_error(exc), 500)
     finally:

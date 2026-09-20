@@ -1,6 +1,6 @@
 # Quantum Nonogram Solver
 
-Solves [nonogram](https://en.wikipedia.org/wiki/Nonogram) (Picross) puzzles two ways — by brute-force SAT search and by Grover's algorithm in Qiskit — and reports solve time, circuit depth and gate counts for both. Grover circuits run on the local statevector simulator or on IBM hardware through Qiskit Runtime. The repo holds a Python library, a JSON API over Flask and Socket.IO, and a demo notebook. The browser UI that calls this API lives in the website repo.
+Solves [nonogram](https://en.wikipedia.org/wiki/Nonogram) (Picross) puzzles two ways — by brute-force SAT search and by Grover's algorithm in Qiskit — and reports solve time, circuit depth and gate counts for both. Grover circuits run on the local statevector simulator or on IBM hardware through Qiskit Runtime. The repo holds a Python library and a JSON API over Flask and Socket.IO. The browser UI that calls this API lives in the website repo.
 
 ```
 Example: 4×6 puzzle              Solution:
@@ -44,7 +44,7 @@ conda env create --prefix .conda --file environment.yml
 pip install -e .
 ```
 
-`python tools/webapp.py` starts the API on `http://localhost:8080`; set `PORT` to move it. `make app` does the same, `make lab` starts JupyterLab with the demo notebook, and `make test` runs the suite.
+`python tools/webapp.py` starts the API on `http://localhost:8080`; set `PORT` to move it. `make app` does the same, `make test` runs the suite and `make bench` runs the size-by-size comparison.
 
 ## The API
 
@@ -62,6 +62,14 @@ curl -s -X POST localhost:8080/api/solve/classical/sync \
 ```
 
 Every solve has an asynchronous form that answers `{"ok": true}` and delivers the result over Socket.IO (`cl_done`, `qu_done`, `bench_done`), and a `/sync` form that returns it in the HTTP response. Errors share one envelope: `{"error": {"code": "<slug>", "message": "<human>"}}`.
+
+A quantum result carries the raw `counts` and an `outcomes` list — the same distribution ranked by probability, with each bitstring already reversed into row-major order, which is what a histogram is drawn from:
+
+```json
+{"outcomes": [{"bitstring": "1001", "grid": "1001", "count": 500, "probability": 0.49}]}
+```
+
+Add `"chart": true` to a quantum request and the response also carries `chart_img`, a base64 PNG of that distribution, for callers that would rather not draw it.
 
 Two things guard the service. Every route but `/health` needs the gateway's `X-Origin-Secret`, and with `ORIGIN_SECRET` unset the API refuses to serve at all unless you pass `NONOGRAM_ALLOW_INSECURE=1` for local work. Solves are capped at 20 grid cells, because both solvers are exponential in area, and one solve runs at a time — a second request gets a 409 while the first is running.
 
@@ -142,7 +150,24 @@ report = benchmark(([(2,), (2,)], [(2,), (2,)]), run_classical=True, run_quantum
 print_report(report)
 ```
 
-The report carries both solve times, the theoretical and measured speedup, qubit count, circuit depth, gate counts, peak memory and whether the solution checks out.
+`benchmark()` runs both solvers on one puzzle and captures:
+
+| Metric | Classical | Quantum |
+|---|---|---|
+| Wall-clock solve time | ✓ | ✓ |
+| Peak memory | ✓ | ✓ |
+| Solutions found | ✓ | ✓ |
+| Configurations evaluated | 2^(n·d) | — |
+| Throughput (configs/s) | ✓ | — |
+| Clause, subclause and literal evaluations | ✓ | — |
+| Qubits, circuit depth, gate counts | — | ✓ |
+| Grover iterations | — | ✓ |
+| Top-state measurement probability | — | ✓ |
+| Theoretical Grover speedup √N | derived | derived |
+| Actual speedup (time ratio) | derived | derived |
+| Oracle call reduction | derived | derived |
+
+`print_report(report)` prints all of it; `tools/chart.report_to_dict(report)` is the same data as JSON, which is what the API returns. The classical side is exponential in grid area, so benchmark small: a 2×3 answers instantly, the 4×6 demo puzzle takes about 18 minutes.
 
 ## Puzzle files
 

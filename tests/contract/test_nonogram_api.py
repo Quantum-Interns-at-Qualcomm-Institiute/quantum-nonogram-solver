@@ -118,3 +118,6 @@ class TestSyncRoutes:
         assert isinstance(body["counts"], dict)
         assert body["rows"] == 2
         assert body["cols"] == 2
+        # The ranked, row-major view a chart is drawn from.
+        assert body["outcomes"][0]["grid"] in ("1001", "0110")
+        assert 0.0 <= body["outcomes"][0]["probability"] <= 1.0

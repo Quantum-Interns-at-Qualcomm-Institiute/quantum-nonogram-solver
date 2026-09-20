@@ -67,7 +67,7 @@ class TestManualCheck:
 
 class TestDemoPuzzle:
     """Exhaustive brute-force tests use a 4×4 puzzle (2^16 candidates) that
-    completes in < 1 s.  The original 4×6 notebook puzzle (2^24 candidates) is
+    completes in < 1 s.  The 4×6 puzzle from the README (2^24 candidates) is
     validated via the fast *manual_check* path only.
     """
 
@@ -78,7 +78,7 @@ class TestDemoPuzzle:
     )
     EXPECTED_4x4 = "0110111111110110"
 
-    # Original 4×6 notebook puzzle — too large for brute-force in test time
+    # The README's 4×6 example — too large for brute-force in test time
     PUZZLE_4x6 = (
         [(1, 1), (2, 2), (1, 2, 1), (1, 1)],
         [(4,), (1,), (1,), (1,), (1,), (4,)],
@@ -94,6 +94,6 @@ class TestDemoPuzzle:
         assert len(results) == 1
 
     def test_manual_check_accepts_known_solution(self):
-        """Fast path: verifies the 4×6 notebook solution without exhaustive search."""
+        """Fast path: verifies the 4×6 solution without exhaustive search."""
         results = classical_solve(self.PUZZLE_4x6, manual_check=self.EXPECTED_4x6)
         assert results == [self.EXPECTED_4x6]

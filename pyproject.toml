@@ -34,8 +34,6 @@ include = ["nonogram*", "tools*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-# The demo notebook is presentation material, not library code.
-extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 # Complexity budgets (C90/PLR) + rewrite-to-shorter families (SIM/RET/C4/PIE/

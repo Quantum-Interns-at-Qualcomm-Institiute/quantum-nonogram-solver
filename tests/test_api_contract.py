@@ -197,5 +197,6 @@ class TestSocketIOEvents:
 
         events = collect_events(sio_client, "qu_done", timeout=30)
         assert len(events) == 1
-        assert set(events[0]) == {"counts", "rows", "cols"}
+        assert set(events[0]) == {"counts", "rows", "cols", "outcomes"}
         assert isinstance(events[0]["counts"], dict)
+        assert events[0]["outcomes"][0]["grid"] == "1111"

@@ -38,7 +38,10 @@ _STREAMING = [
     {
         "protocol": "socket.io",
         "event": "qu_done",
-        "description": "Quantum solve result; live equivalent of POST /api/solve/quantum/sync.",
+        "description": (
+            "Quantum solve result — counts plus the ranked row-major outcomes a "
+            "histogram is drawn from; live equivalent of POST /api/solve/quantum/sync."
+        ),
     },
     {
         "protocol": "socket.io",

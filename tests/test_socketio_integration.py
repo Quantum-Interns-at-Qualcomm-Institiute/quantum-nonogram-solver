@@ -159,3 +159,30 @@ def test_busy_is_released_after_every_solve(client, sio_client, path):
     assert client.post(path, json=body).status_code == 200
     assert collect_events(sio_client, "busy", timeout=60)
     assert state["busy"] is False
+
+
+class TestMeasurementHistogram:
+    """The distribution ships as data always, and as a PNG when the caller asks."""
+
+    BODY = {"row_clues": [[2], [2]], "col_clues": [[2], [2]]}
+
+    def test_outcomes_are_always_present(self, client):
+        body = client.post("/api/solve/quantum/sync", json=self.BODY).get_json()
+        assert body["outcomes"][0]["grid"] == "1111"
+        assert "chart_img" not in body
+
+    def test_chart_is_opt_in(self, client):
+        import base64
+
+        body = client.post(
+            "/api/solve/quantum/sync", json={**self.BODY, "chart": True}
+        ).get_json()
+        assert base64.b64decode(body["chart_img"])[:4] == b"\x89PNG"
+
+    def test_async_path_carries_the_same_shape(self, client, sio_client):
+        client.post("/api/solve/quantum", json={**self.BODY, "chart": True})
+
+        events = collect_events(sio_client, "qu_done", timeout=30)
+        assert len(events) == 1
+        assert events[0]["outcomes"][0]["grid"] == "1111"
+        assert events[0]["chart_img"]

@@ -4,8 +4,6 @@ channels:
   - defaults
 dependencies:
   - python=3.11
-  - ipykernel
-  - jupyterlab
   - pip
   - pip:
     # the package pulls its own dependencies from pyproject.toml; listing them

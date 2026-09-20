@@ -102,6 +102,56 @@ def report_to_dict(report: Any) -> dict:
     return d
 
 
+def measurement_rows(counts: dict, top_n: int = 16) -> list[dict]:
+    """The measurement distribution as rows, most likely first.
+
+    Each row carries the bitstring as the sampler returned it, the row-major grid
+    reading (Qiskit is little-endian), the raw value and its share of the total.
+    """
+    total = sum(counts.values())
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])[:top_n]
+    return [
+        {
+            "bitstring": bs,
+            "grid": bs[::-1],
+            "count": value,
+            "probability": value / total if total else 0.0,
+        }
+        for bs, value in ranked
+    ]
+
+
+def render_histogram_b64(counts: dict, top_n: int = 16) -> str:
+    """Render the measurement distribution as a base64 PNG bar chart."""
+    rows = measurement_rows(counts, top_n)
+    if not rows:
+        return ""
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(max(4, len(rows) * 0.55), 3.2), facecolor=BG_CARD)
+    ax.set_facecolor("#f4f8fc")
+    ax.bar([r["grid"] for r in rows], [r["probability"] for r in rows], color=BTN_QU)
+    ax.set_title("Measurement outcomes", color=FG_MAIN, fontsize=10)
+    ax.set_ylabel("probability", color=FG_MAIN, fontsize=8)
+    ax.tick_params(axis="x", rotation=90, colors=FG_MAIN, labelsize=7)
+    ax.tick_params(axis="y", colors=FG_MAIN, labelsize=8)
+    for spine in ax.spines.values():
+        spine.set_color("#c0c8d0")
+
+    fig.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=110)
+    plt.close(fig)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode()
+
+
 def render_chart_b64(
     report: Any,
     cl_times: list[float],
