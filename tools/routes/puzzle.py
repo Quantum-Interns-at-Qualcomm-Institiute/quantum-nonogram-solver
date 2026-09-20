@@ -31,7 +31,7 @@ def api_puzzle_load():
             # load_puzzle validates clue shape, values and the per-line size cap
             # before the grid below is allocated, so a bad upload is a 400.
             data = load_puzzle(tmp.name)
-        except (ValidationError, PuzzleIOError, ValueError, KeyError) as exc:
+        except (ValidationError, PuzzleIOError, ValueError) as exc:
             return respond_error("invalid_puzzle", str(exc)[:500], 400)
         finally:
             Path(tmp.name).unlink()

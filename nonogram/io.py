@@ -148,6 +148,9 @@ def save_puzzle(
 def load_puzzle(path: str | Path) -> dict[str, Any]:
     """Load a puzzle from a ``.non.json`` file.
 
+    Clue shape, clue values and the per-line size cap are checked before the dict is
+    returned, so a caller can size a grid from ``rows``/``cols`` without re-checking.
+
     Returns a dict with keys:
     ``name``, ``rows``, ``cols``, ``row_clues``, ``col_clues``,
     ``created``, ``tags``.
@@ -161,6 +164,15 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
     if not path.exists():
         raise PuzzleIOError(f"Puzzle file not found: {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
+
+    if not isinstance(data, dict):
+        raise ValidationError(f"Puzzle file must hold a JSON object, got {type(data).__name__}")
+    for key in ("row_clues", "col_clues"):
+        if not isinstance(data.get(key), list):
+            raise ValidationError(f"Puzzle file must carry '{key}' as a list of clue lists")
+        if not all(isinstance(clue, list) for clue in data[key]):
+            raise ValidationError(f"Every entry of '{key}' must be a list of block lengths")
+    _validate_clues(data["row_clues"], data["col_clues"])
 
     # Hand-written puzzles may omit optional keys; path.stem drops only one suffix.
     stem = path.stem

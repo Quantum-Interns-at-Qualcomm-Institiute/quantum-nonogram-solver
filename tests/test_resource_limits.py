@@ -63,6 +63,33 @@ class TestSolveRouteBadBody:
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == "invalid_puzzle"
 
+    @pytest.mark.parametrize(
+        "document",
+        [
+            [1, 2],
+            {"row_clues": 5, "col_clues": [[1]]},
+            {"row_clues": [[-5]], "col_clues": [[1]]},
+            {"row_clues": [[1]] * 40, "col_clues": [[1]] * 40},
+        ],
+        ids=["list", "scalar", "negative", "oversized"],
+    )
+    def test_upload_is_validated_before_it_reaches_state(self, client, document):
+        """An upload past the size cap used to set rows/cols beyond MAX_GRID."""
+        import io as _io
+
+        from tools.state import state
+
+        buf = _io.BytesIO(json.dumps(document).encode())
+        resp = client.post(
+            "/api/puzzle/load",
+            data={"file": (buf, "p.non.json")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "invalid_puzzle"
+        assert state["rows"] <= 10
+        assert state["cols"] <= 10
+
 
 class TestMalformedFieldsAre400:
     """A field the caller got wrong is a 400, never a 500.

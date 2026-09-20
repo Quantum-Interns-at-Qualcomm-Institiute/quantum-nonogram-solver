@@ -247,6 +247,26 @@ class TestLoadPuzzle:
         assert loaded["rows"] == len(SIMPLE_ROW_CLUES)
         assert loaded["cols"] == len(SIMPLE_COL_CLUES)
 
+    @pytest.mark.parametrize(
+        "document",
+        [
+            [1, 2],
+            {"col_clues": [[1]]},
+            {"row_clues": 5, "col_clues": [[1]]},
+            {"row_clues": [1], "col_clues": [[1]]},
+            {"row_clues": [[-5]], "col_clues": [[1]]},
+            {"row_clues": [["zz"]], "col_clues": [[1]]},
+            {"row_clues": [[1]] * 11, "col_clues": [[1]] * 11},
+        ],
+        ids=["list", "missing", "scalar", "flat", "negative", "string", "oversized"],
+    )
+    def test_malformed_documents_raise(self, tmp_path, document):
+        """A caller can size a grid from the result, so the shape is checked on load."""
+        dest = tmp_path / "bad.non.json"
+        dest.write_text(json.dumps(document))
+        with pytest.raises(ValueError):
+            load_puzzle(dest)
+
     def test_missing_optional_keys_get_defaults(self, tmp_path):
         dest = tmp_path / "bare.non.json"
         dest.write_text(
