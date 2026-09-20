@@ -6,6 +6,7 @@ import pytest
 
 from nonogram.core import rle
 from nonogram.data import possible_d
+from nonogram.io import _MAX_LINE
 
 # The key format regex: "length/clue;clue;...;" where length and clues are ints.
 KEY_PATTERN = re.compile(r"^(\d+)/((?:\d+;)+)$")
@@ -67,11 +68,11 @@ class TestKeyFormat:
                 assert c >= 0, f"Key has negative clue value: {key!r}"
 
 
-# 2. Coverage of lengths 1-6
+# 2. Coverage of every length the table is built for
 
 
 class TestLengthCoverage:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_length_present(self, length):
         keys_for_length = [k for k in possible_d if k.startswith(f"{length}/")]
         assert len(keys_for_length) > 0, (
@@ -110,7 +111,7 @@ class TestNoDuplicatePatterns:
 
 
 class TestEmptyClue:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_empty_clue_single_zero_pattern(self, length):
         key = f"{length}/0;"
         assert key in possible_d, f"Missing empty clue key: {key!r}"
@@ -127,7 +128,7 @@ class TestEmptyClue:
 
 
 class TestFullClue:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_full_clue_single_all_ones_pattern(self, length):
         key = f"{length}/{length};"
         assert key in possible_d, f"Missing full clue key: {key!r}"
@@ -146,7 +147,7 @@ class TestFullClue:
 
 
 class TestPatternCompleteness:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_exhaustive_completeness(self, length):
         """For each length, exhaustively check all 2^length bitstrings.
 
@@ -163,7 +164,7 @@ class TestPatternCompleteness:
                 f"Pattern {bitstring:#0{length + 2}b} missing from {key!r}"
             )
 
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_no_extra_patterns(self, length):
         """Verify the table has no patterns beyond what exhaustive enumeration produces."""
         # Build expected mapping from exhaustive enumeration

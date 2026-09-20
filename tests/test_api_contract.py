@@ -8,62 +8,11 @@ to catch breaking changes before they reach the frontend.
 from __future__ import annotations
 
 import json
-import sys
-import time
 from io import BytesIO
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from conftest import collect_events
 
-import pytest
-from flask import Flask
-from flask_socketio import SocketIO
-
-from tools import state as app_state
 from tools.config import MAX_CLUES, MAX_GRID
-from tools.routes import ALL_BLUEPRINTS
-
-
-@pytest.fixture()
-def app():
-    test_app = Flask(__name__)
-    test_app.config["TESTING"] = True
-    test_app.config["SECRET_KEY"] = "test"
-
-    sio = SocketIO(test_app, async_mode="threading")
-    app_state.init(sio)
-
-    for bp in ALL_BLUEPRINTS:
-        test_app.register_blueprint(bp)
-
-    # Register config endpoint
-    from tools.webapp import api_config
-
-    test_app.add_url_rule("/api/config", view_func=api_config)
-
-    app_state.state.update(
-        {
-            "rows": 3,
-            "cols": 3,
-            "grid": [[False] * 3 for _ in range(3)],
-            "hw_config": None,
-            "busy": False,
-            "puzzle_name": "test-puzzle",
-        }
-    )
-    yield test_app, sio
-
-
-@pytest.fixture()
-def client(app):
-    return app[0].test_client()
-
-
-@pytest.fixture()
-def sio_client(app):
-    """Socket.IO test client for verifying emitted events."""
-    test_app, sio = app
-    return sio.test_client(test_app)
 
 
 class TestGridAPIContract:
@@ -157,18 +106,13 @@ class TestSolverAPIContract:
         assert resp.status_code == 200
         assert resp.get_json() == {"ok": True}
 
-    def test_busy_returns_409(self, client):
-        with app_state.state_lock:
-            app_state.state["busy"] = True
+    def test_busy_returns_409(self, client, busy_solver):
         resp = client.post(
             "/api/solve/classical",
             json={"row_clues": [[1]], "col_clues": [[1]]},
         )
         assert resp.status_code == 409
-        data = resp.get_json()
-        assert "error" in data
-        with app_state.state_lock:
-            app_state.state["busy"] = False
+        assert resp.get_json()["error"]["code"] == "solver_busy"
 
 
 class TestBenchmarkAPIContract:
@@ -236,25 +180,22 @@ class TestConfigAPIContract:
 
 
 class TestSocketIOEvents:
-    """Verify Socket.IO event emission from solver routes."""
+    """The result events the frontend subscribes to, and the shape it reads from them."""
 
     def test_classical_solve_emits_cl_done(self, sio_client, client):
-        """Classical solve should eventually emit cl_done with solutions."""
         payload = {"row_clues": [[2], [2]], "col_clues": [[2], [2]]}
         client.post("/api/solve/classical", json=payload)
-        # Give the background thread time to complete
-        time.sleep(2)
-        received = sio_client.get_received()
-        event_names = [e["name"] for e in received]
-        # Should have received status and cl_done events
-        assert "status" in event_names or "cl_done" in event_names or "busy" in event_names
+
+        events = collect_events(sio_client, "cl_done")
+        assert len(events) == 1
+        assert set(events[0]) == {"solutions", "rows", "cols"}
+        assert events[0]["solutions"] == ["1111"]
 
     def test_quantum_solve_emits_qu_done(self, sio_client, client):
-        """Quantum solve should eventually emit qu_done with counts."""
         payload = {"row_clues": [[2], [2]], "col_clues": [[2], [2]]}
         client.post("/api/solve/quantum", json=payload)
-        # Give the background thread time to complete
-        time.sleep(3)
-        received = sio_client.get_received()
-        event_names = [e["name"] for e in received]
-        assert "status" in event_names or "qu_done" in event_names or "busy" in event_names
+
+        events = collect_events(sio_client, "qu_done", timeout=30)
+        assert len(events) == 1
+        assert set(events[0]) == {"counts", "rows", "cols"}
+        assert isinstance(events[0]["counts"], dict)

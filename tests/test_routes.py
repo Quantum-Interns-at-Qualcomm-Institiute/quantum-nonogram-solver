@@ -10,63 +10,8 @@ All solver routes are tested with mocked solvers to avoid slow computation.
 from __future__ import annotations
 
 import json
-import sys
-from pathlib import Path
 
-import pytest
-
-# Ensure project root is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-
-# Fixtures
-
-
-@pytest.fixture()
-def app():
-    """Create a Flask app wired with all blueprints and a test SocketIO."""
-    from flask import Flask
-    from flask_socketio import SocketIO
-
-    from tools import state as app_state
-    from tools.routes import ALL_BLUEPRINTS
-
-    test_app = Flask(
-        __name__,
-        template_folder=str(Path(__file__).resolve().parent.parent / "tools" / "templates"),
-        static_folder=str(Path(__file__).resolve().parent.parent / "tools" / "static"),
-    )
-    test_app.config["TESTING"] = True
-    test_app.config["SECRET_KEY"] = "test"
-    # Mirror the production body-size guard.
-    from tools.config import MAX_CONTENT_LENGTH
-
-    test_app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
-
-    sio = SocketIO(test_app, async_mode="threading")
-    app_state.init(sio)
-
-    for bp in ALL_BLUEPRINTS:
-        test_app.register_blueprint(bp)
-
-    # Reset state before each test
-    app_state.state.update(
-        {
-            "rows": 4,
-            "cols": 4,
-            "grid": [[False] * 4 for _ in range(4)],
-            "hw_config": None,
-            "busy": False,
-            "puzzle_name": "puzzle",
-        }
-    )
-
-    yield test_app
-
-
-@pytest.fixture()
-def client(app):
-    return app.test_client()
+# Fixtures come from conftest: `client` is the deployed app's test client.
 
 
 # Grid routes
@@ -176,13 +121,8 @@ class TestSolverRoutes:
         assert resp.status_code == 200
         assert resp.get_json()["ok"] is True
 
-    def test_solver_busy_rejection(self, client):
+    def test_solver_busy_rejection(self, client, busy_solver):
         """Solver endpoints reject requests when busy."""
-        from tools.state import state, state_lock
-
-        with state_lock:
-            state["busy"] = True
-
         payload = {
             "row_clues": [[2], [2]],
             "col_clues": [[2], [2]],
@@ -195,10 +135,6 @@ class TestSolverRoutes:
 
         resp = client.post("/api/benchmark", json={**payload, "trials": 1})
         assert resp.status_code == 409
-
-        # Clean up
-        with state_lock:
-            state["busy"] = False
 
     def test_benchmark_returns_ok(self, client):
         payload = {
@@ -330,14 +266,6 @@ class TestRunsRoutes:
         assert resp.status_code == 200
         assert resp.get_json()["ok"] is True
 
-    def test_runs_delete_rejected_when_busy(self, client):
-        from tools.state import state, state_lock
-
-        with state_lock:
-            state["busy"] = True
-
+    def test_runs_delete_rejected_when_busy(self, client, busy_solver):
         resp = client.post("/api/runs/delete")
         assert resp.status_code == 409
-
-        with state_lock:
-            state["busy"] = False

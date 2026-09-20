@@ -12,27 +12,12 @@ import json
 import time
 
 import pytest
-from flask_socketio import SocketIOTestClient
+from conftest import collect_events
 
 from tools.config import MAX_CLUES, MAX_GRID
-from tools.webapp import app, socketio
+from tools.webapp import app
 
 # Fixtures
-
-@pytest.fixture(autouse=True)
-def _reset_state():
-    """Reset server state before every test so tests are independent."""
-    from tools.state import state, state_lock
-
-    with state_lock:
-        state["rows"] = 4
-        state["cols"] = 4
-        state["grid"] = [[False] * 4 for _ in range(4)]
-        state["hw_config"] = None
-        state["busy"] = False
-        state["puzzle_name"] = "puzzle"
-    yield
-
 
 @pytest.fixture()
 def http_client():
@@ -40,15 +25,6 @@ def http_client():
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
-
-
-@pytest.fixture()
-def sio_client():
-    """Socket.IO test client wrapping the Flask test client."""
-    app.config["TESTING"] = True
-    client = SocketIOTestClient(app, socketio)
-    yield client
-    client.disconnect()
 
 
 # Tiny 2x2 puzzle clues used throughout the tests
@@ -80,15 +56,17 @@ class TestClassicalSolvePipeline:
         assert rv.status_code == 200
         assert rv.get_json()["ok"] is True
 
-    def test_classical_solve_sets_busy(self, http_client):
-        """After triggering solve, server should briefly be busy."""
-        http_client.post("/api/grid", json={"rows": 2, "cols": 2})
+    def test_classical_solve_sets_busy(self, http_client, sio_client):
+        """The solve holds the busy flag and releases it when the worker finishes."""
+        from tools.state import state
+
         http_client.post("/api/solve/classical", json={
             "row_clues": SIMPLE_ROW_CLUES,
             "col_clues": SIMPLE_COL_CLUES,
         })
-        # Wait for solve to complete (tiny puzzle, fast)
-        time.sleep(1)
+        assert collect_events(sio_client, "cl_done")
+        assert collect_events(sio_client, "busy") == [{"busy": False}]
+        assert state["busy"] is False
 
 
 # 2. Full solve pipeline: POST grid -> POST solve/quantum -> Socket.IO
@@ -96,7 +74,7 @@ class TestClassicalSolvePipeline:
 class TestQuantumSolvePipeline:
     """POST /api/grid then POST /api/solve/quantum — verify HTTP response."""
 
-    def test_quantum_solve_accepts_request(self, http_client):
+    def test_quantum_solve_accepts_request(self, http_client, sio_client):
         http_client.post("/api/grid", json={
             "rows": 2, "cols": 2,
             "grid": [[True, True], [True, True]],
@@ -107,8 +85,7 @@ class TestQuantumSolvePipeline:
         })
         assert rv.status_code == 200
         assert rv.get_json()["ok"] is True
-        # Wait for background solve to complete
-        time.sleep(2)
+        assert collect_events(sio_client, "qu_done", timeout=30)
 
 
 # 3. Benchmark endpoint with trials=1 -> verify bench_done event
@@ -116,7 +93,7 @@ class TestQuantumSolvePipeline:
 class TestBenchmarkEndpoint:
     """POST /api/benchmark with trials=1 and verify bench_done payload."""
 
-    def test_benchmark_accepts_request(self, http_client):
+    def test_benchmark_accepts_request(self, http_client, sio_client):
         http_client.post("/api/grid", json={"rows": 2, "cols": 2})
         rv = http_client.post("/api/benchmark", json={
             "row_clues": SIMPLE_ROW_CLUES,
@@ -124,10 +101,8 @@ class TestBenchmarkEndpoint:
             "trials": 1,
         })
         assert rv.status_code == 200
-        data = rv.get_json()
-        assert data["ok"] is True
-        # Wait for background benchmark to finish
-        time.sleep(3)
+        assert rv.get_json()["ok"] is True
+        assert collect_events(sio_client, "bench_done", timeout=60)
 
 
 # 4. Grid randomize -> verify random grid has valid clues
@@ -209,20 +184,14 @@ class TestPuzzleSaveLoadRoundtrip:
 class TestPuzzleLoadInvalidJSON:
     """Upload malformed data to /api/puzzle/load and expect an error."""
 
-    def test_invalid_json_raises_or_returns_error(self, http_client):
-        bad_data = b"{ this is not valid json !!!"
-        # In TESTING mode, Flask propagates exceptions. The endpoint doesn't
-        # catch JSON parse errors, so we expect either an error status or
-        # an unhandled exception.
-        try:
-            rv = http_client.post(
-                "/api/puzzle/load",
-                data={"file": (io.BytesIO(bad_data), "broken.json")},
-                content_type="multipart/form-data",
-            )
-            assert rv.status_code >= 400
-        except Exception:
-            pass  # Exception propagation in test mode is acceptable
+    def test_invalid_json_returns_400(self, http_client):
+        rv = http_client.post(
+            "/api/puzzle/load",
+            data={"file": (io.BytesIO(b"{ this is not valid json !!!"), "broken.json")},
+            content_type="multipart/form-data",
+        )
+        assert rv.status_code == 400
+        assert rv.get_json()["error"]["code"] == "invalid_puzzle"
 
     def test_no_file_returns_400(self, http_client):
         rv = http_client.post("/api/puzzle/load", data={},
@@ -270,11 +239,7 @@ class TestGridClamping:
 class TestConcurrentSolveRejection:
     """When the solver is busy, new solve requests should get 409."""
 
-    def test_classical_solve_rejected_when_busy(self, http_client):
-        from tools.state import state, state_lock
-        with state_lock:
-            state["busy"] = True
-
+    def test_classical_solve_rejected_when_busy(self, http_client, busy_solver):
         rv = http_client.post("/api/solve/classical", json={
             "row_clues": SIMPLE_ROW_CLUES,
             "col_clues": SIMPLE_COL_CLUES,
@@ -282,11 +247,7 @@ class TestConcurrentSolveRejection:
         assert rv.status_code == 409
         assert "busy" in rv.get_json()["error"]["message"].lower()
 
-    def test_quantum_solve_rejected_when_busy(self, http_client):
-        from tools.state import state, state_lock
-        with state_lock:
-            state["busy"] = True
-
+    def test_quantum_solve_rejected_when_busy(self, http_client, busy_solver):
         rv = http_client.post("/api/solve/quantum", json={
             "row_clues": SIMPLE_ROW_CLUES,
             "col_clues": SIMPLE_COL_CLUES,
@@ -294,11 +255,7 @@ class TestConcurrentSolveRejection:
         assert rv.status_code == 409
         assert "busy" in rv.get_json()["error"]["message"].lower()
 
-    def test_benchmark_rejected_when_busy(self, http_client):
-        from tools.state import state, state_lock
-        with state_lock:
-            state["busy"] = True
-
+    def test_benchmark_rejected_when_busy(self, http_client, busy_solver):
         rv = http_client.post("/api/benchmark", json={
             "row_clues": SIMPLE_ROW_CLUES,
             "col_clues": SIMPLE_COL_CLUES,
@@ -306,11 +263,7 @@ class TestConcurrentSolveRejection:
         })
         assert rv.status_code == 409
 
-    def test_runs_delete_rejected_when_busy(self, http_client):
-        from tools.state import state, state_lock
-        with state_lock:
-            state["busy"] = True
-
+    def test_runs_delete_rejected_when_busy(self, http_client, busy_solver):
         rv = http_client.post("/api/runs/delete")
         assert rv.status_code == 409
 
@@ -378,32 +331,3 @@ class TestRunsInfoDeleteCycle:
         # Verify runs are gone
         rv = http_client.get("/api/runs/info")
         assert rv.get_json()["count"] == 0
-
-
-# Helpers
-
-def _collect_events(
-    sio_client: SocketIOTestClient,
-    target_event: str,
-    timeout: float = 10,
-) -> list[dict]:
-    """Poll the SocketIO test client for *target_event* until timeout.
-
-    Returns a list of matching received events.  Each item is a dict
-    with keys ``name`` and ``args``.
-    """
-    deadline = time.monotonic() + timeout
-    found: list[dict] = []
-
-    while time.monotonic() < deadline:
-        received = sio_client.get_received()
-        for item in received:
-            if item["name"] == target_event:
-                # SocketIO test client wraps args in a list
-                args = item["args"][0] if item.get("args") else {}
-                found.append({"name": item["name"], "args": args})
-        if found:
-            return found
-        time.sleep(0.2)
-
-    return found

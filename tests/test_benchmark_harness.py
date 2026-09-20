@@ -13,7 +13,6 @@ from nonogram.metrics import (
 )
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2x2
-MEDIUM_PUZZLE = ([(1,), (1,), (0,)], [(1,), (1,), (0,)])  # 3x3
 
 
 class TestBenchmarkWithExecutionCounts:
@@ -102,12 +101,11 @@ class TestFullBenchmarkPipeline:
         assert result.constraint_density_metrics is not None
 
     def test_classical_constraint_checks_consistent(self):
+        """Early termination means fewer clause checks than candidates x clauses."""
         result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        # Constraint checks should be less than or equal to
-        # candidates * total_clauses (since early termination occurs)
-        assert result.classical.constraint_checks <= (
-            result.classical.configurations_evaluated * 100
-        )
+        clauses = len(SMALL_PUZZLE[0]) + len(SMALL_PUZZLE[1])
+        ceiling = result.classical.configurations_evaluated * clauses
+        assert 0 < result.classical.clause_evaluations < ceiling
 
     def test_print_report_with_all_sections(self):
         import io

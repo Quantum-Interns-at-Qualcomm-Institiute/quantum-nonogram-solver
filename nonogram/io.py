@@ -56,6 +56,16 @@ _MAX_CELLS = 20
 # Internal helpers
 
 
+def _check_block_lengths(clues: list, label: str) -> None:
+    """Raise ValidationError unless every block length is a non-negative integer."""
+    for i, clue in enumerate(clues):
+        for v in clue:
+            if not isinstance(v, int) or v < 0:
+                raise ValidationError(
+                    f"{label}[{i}] contains non-integer or negative value: {v!r}"
+                )
+
+
 def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
     """Raise ValidationError if clues are obviously malformed.
 
@@ -64,18 +74,13 @@ def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
     solve/benchmark routes pass (both solvers are exponential in area). Library
     save/load omits it, so any size up to the per-line cap can still be stored.
     """
-    for i, clue in enumerate(row_clues):
-        for v in clue:
-            if not isinstance(v, int) or v < 0:
-                raise ValidationError(
-                    f"row_clues[{i}] contains non-integer or negative value: {v!r}"
-                )
-    for j, clue in enumerate(col_clues):
-        for v in clue:
-            if not isinstance(v, int) or v < 0:
-                raise ValidationError(
-                    f"col_clues[{j}] contains non-integer or negative value: {v!r}"
-                )
+    if not row_clues or not col_clues:
+        raise ValidationError(
+            f"Puzzle must have at least one row and one column, got "
+            f"{len(row_clues)}×{len(col_clues)}."
+        )
+    _check_block_lengths(row_clues, "row_clues")
+    _check_block_lengths(col_clues, "col_clues")
     if len(row_clues) > _MAX_LINE or len(col_clues) > _MAX_LINE:
         raise ValidationError(
             f"Puzzle exceeds maximum supported size ({_MAX_LINE}×{_MAX_LINE}). "

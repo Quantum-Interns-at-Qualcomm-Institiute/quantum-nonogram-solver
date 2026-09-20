@@ -395,10 +395,10 @@ class TestLoadBatch:
         assert all(isinstance(p, dict) for p in loaded)
 
     def test_sorted_by_filename(self, tmp_path):
+        """Files come back in filename order, which is the index order save_batch wrote."""
         save_batch(BATCH_PUZZLES, tmp_path)
         loaded = load_batch(tmp_path)
-        names = [p["name"] for p in loaded]
-        assert names == sorted(names) or len(names) == len(BATCH_PUZZLES)  # sorted determinism
+        assert [p["name"] for p in loaded] == [p["name"] for p in BATCH_PUZZLES]
 
     def test_missing_directory_raises(self, tmp_path):
         with pytest.raises(PuzzleIOError):
