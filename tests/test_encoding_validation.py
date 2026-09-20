@@ -370,7 +370,7 @@ class TestClassicalRejection:
     """Test that the classical clause list rejects invalid bitstrings."""
 
     @staticmethod
-    def _check_classical(clauses, num_vars, bitstring: str) -> bool:
+    def _check_classical(clauses, bitstring: str) -> bool:
         """Check if a bitstring satisfies all classical constraint groups.
 
         Each constraint group is a list of clauses (DNF per line).
@@ -402,35 +402,31 @@ class TestClassicalRejection:
         return True
 
     def test_classical_accepts_valid_2x2(self):
-        clauses, num_vars = puzzle_to_boolean(
-            [(1,), (1,)], [(1,), (1,)], classical=True
-        )
-        assert self._check_classical(clauses, num_vars, "1001")
-        assert self._check_classical(clauses, num_vars, "0110")
+        clauses, _ = puzzle_to_boolean([(1,), (1,)], [(1,), (1,)], classical=True)
+        assert self._check_classical(clauses, "1001")
+        assert self._check_classical(clauses, "0110")
 
     def test_classical_rejects_invalid_2x2(self):
-        clauses, num_vars = puzzle_to_boolean(
-            [(1,), (1,)], [(1,), (1,)], classical=True
-        )
+        clauses, _ = puzzle_to_boolean([(1,), (1,)], [(1,), (1,)], classical=True)
         # All-filled violates (1,) row constraint (needs exactly 1 filled).
-        assert not self._check_classical(clauses, num_vars, "1111")
+        assert not self._check_classical(clauses, "1111")
         # All-empty violates (1,) row constraint.
-        assert not self._check_classical(clauses, num_vars, "0000")
+        assert not self._check_classical(clauses, "0000")
 
     def test_classical_exhaustive_1x1(self):
-        clauses, num_vars = puzzle_to_boolean([(1,)], [(1,)], classical=True)
-        assert self._check_classical(clauses, num_vars, "1")
-        assert not self._check_classical(clauses, num_vars, "0")
+        clauses, _ = puzzle_to_boolean([(1,)], [(1,)], classical=True)
+        assert self._check_classical(clauses, "1")
+        assert not self._check_classical(clauses, "0")
 
     def test_classical_and_boolean_agree(self):
         """Classical and boolean modes should accept the same bitstrings."""
         row_clues = [(1,), (1,)]
         col_clues = [(1,), (1,)]
         expr = puzzle_to_boolean(row_clues, col_clues)
-        clauses, num_vars = puzzle_to_boolean(row_clues, col_clues, classical=True)
+        clauses, _ = puzzle_to_boolean(row_clues, col_clues, classical=True)
         for bits in _all_bitstrings(4):
             bool_result = _eval_boolean_expr(expr, _bitstring_to_assignment(bits))
-            cl_result = self._check_classical(clauses, num_vars, bits)
+            cl_result = self._check_classical(clauses, bits)
             assert bool_result == cl_result, (
                 f"Mismatch for bitstring {bits}: "
                 f"boolean={bool_result}, classical={cl_result}"

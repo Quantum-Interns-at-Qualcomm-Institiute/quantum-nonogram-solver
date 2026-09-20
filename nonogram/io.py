@@ -19,7 +19,7 @@ Schema::
 
 Usage::
 
-    from nonogram.io import save_puzzle, load_puzzle, save_batch, load_batch
+    from nonogram.io import save_puzzle, load_puzzle
 
     # Save one puzzle
     save_puzzle([[1,1],[2,2]], [[4],[1],[1]], "my_puzzle.non.json", name="Demo")
@@ -28,10 +28,6 @@ Usage::
     data = load_puzzle("my_puzzle.non.json")
     row_clues = [tuple(r) for r in data["row_clues"]]
     col_clues  = [tuple(c) for c in data["col_clues"]]
-
-    # Batch helpers
-    save_batch(list_of_dicts, folder="puzzles/")
-    puzzles = load_batch("puzzles/")
 """
 
 from __future__ import annotations
@@ -44,7 +40,7 @@ from typing import Any
 
 from nonogram.errors import PuzzleIOError, ValidationError
 
-__all__ = ["load_batch", "load_puzzle", "save_batch", "save_puzzle"]
+__all__ = ["load_puzzle", "save_puzzle"]
 
 _MAX_LINE = 10  # the largest grid side the lookup tables cover
 
@@ -56,31 +52,48 @@ _MAX_CELLS = 20
 # Internal helpers
 
 
-def _validate_clues(row_clues: list, col_clues: list, max_cells=None) -> None:
+def _check_block_lengths(clues: list, label: str) -> None:
+    """Raise ValidationError unless every block length is a non-negative integer."""
+    for i, clue in enumerate(clues):
+        for v in clue:
+            if not isinstance(v, int) or v < 0:
+                raise ValidationError(
+                    f"{label}[{i}] contains non-integer or negative value: {v!r}"
+                )
+
+
+def _validate_clues(
+    row_clues: list, col_clues: list, max_cells=None, max_blocks=None
+) -> None:
     """Raise ValidationError if clues are obviously malformed.
 
     When ``max_cells`` is given, also reject puzzles whose grid AREA
     (len(row_clues) * len(col_clues)) exceeds it — a solve-time DoS guard the web
     solve/benchmark routes pass (both solvers are exponential in area). Library
     save/load omits it, so any size up to the per-line cap can still be stored.
+
+    ``max_blocks`` caps the blocks in one clue, which is the limit the API reports
+    through /api/config; the routes that advertise it pass it here.
     """
-    for i, clue in enumerate(row_clues):
-        for v in clue:
-            if not isinstance(v, int) or v < 0:
-                raise ValidationError(
-                    f"row_clues[{i}] contains non-integer or negative value: {v!r}"
-                )
-    for j, clue in enumerate(col_clues):
-        for v in clue:
-            if not isinstance(v, int) or v < 0:
-                raise ValidationError(
-                    f"col_clues[{j}] contains non-integer or negative value: {v!r}"
-                )
+    if not row_clues or not col_clues:
+        raise ValidationError(
+            f"Puzzle must have at least one row and one column, got "
+            f"{len(row_clues)}×{len(col_clues)}."
+        )
+    _check_block_lengths(row_clues, "row_clues")
+    _check_block_lengths(col_clues, "col_clues")
     if len(row_clues) > _MAX_LINE or len(col_clues) > _MAX_LINE:
         raise ValidationError(
             f"Puzzle exceeds maximum supported size ({_MAX_LINE}×{_MAX_LINE}). "
             f"Got {len(row_clues)}×{len(col_clues)}."
         )
+    if max_blocks is not None:
+        for label, clues in (("row_clues", row_clues), ("col_clues", col_clues)):
+            for i, clue in enumerate(clues):
+                if len(clue) > max_blocks:
+                    raise ValidationError(
+                        f"{label}[{i}] has {len(clue)} blocks, above the {max_blocks}-block limit."
+                    )
     if max_cells is not None:
         cells = len(row_clues) * len(col_clues)
         if cells > max_cells:
@@ -148,6 +161,9 @@ def save_puzzle(
 def load_puzzle(path: str | Path) -> dict[str, Any]:
     """Load a puzzle from a ``.non.json`` file.
 
+    Clue shape, clue values and the per-line size cap are checked before the dict is
+    returned, so a caller can size a grid from ``rows``/``cols`` without re-checking.
+
     Returns a dict with keys:
     ``name``, ``rows``, ``cols``, ``row_clues``, ``col_clues``,
     ``created``, ``tags``.
@@ -162,6 +178,15 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
         raise PuzzleIOError(f"Puzzle file not found: {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
 
+    if not isinstance(data, dict):
+        raise ValidationError(f"Puzzle file must hold a JSON object, got {type(data).__name__}")
+    for key in ("row_clues", "col_clues"):
+        if not isinstance(data.get(key), list):
+            raise ValidationError(f"Puzzle file must carry '{key}' as a list of clue lists")
+        if not all(isinstance(clue, list) for clue in data[key]):
+            raise ValidationError(f"Every entry of '{key}' must be a list of block lengths")
+    _validate_clues(data["row_clues"], data["col_clues"])
+
     # Hand-written puzzles may omit optional keys; path.stem drops only one suffix.
     stem = path.stem
     stem = stem.removesuffix(".non")
@@ -171,46 +196,3 @@ def load_puzzle(path: str | Path) -> dict[str, Any]:
     data["rows"] = len(data["row_clues"])
     data["cols"] = len(data["col_clues"])
     return data
-
-
-def save_batch(
-    puzzles: list[dict[str, Any]],
-    folder: str | Path,
-) -> list[Path]:
-    """Write a list of puzzle dicts to *folder*, one file each.
-
-    Each dict must contain ``row_clues``, ``col_clues``, and optionally
-    ``name`` and ``tags`` (all other keys are ignored / recomputed).
-
-    Files are named ``{slug}_{idx:03d}.non.json``.  Returns the list of
-    written file paths.
-    """
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
-    for idx, pz in enumerate(puzzles):
-        name = pz.get("name", f"puzzle_{idx:03d}")
-        slug = _slugify(name)
-        dest = folder / f"{slug}_{idx:03d}.non.json"
-        save_puzzle(
-            row_clues=pz["row_clues"],
-            col_clues=pz["col_clues"],
-            path=dest,
-            name=name,
-            tags=pz.get("tags"),
-        )
-        written.append(dest)
-    return written
-
-
-def load_batch(folder: str | Path) -> list[dict[str, Any]]:
-    """Load all ``.non.json`` files from *folder* and return a sorted list of
-    puzzle dicts (sorted by filename for reproducibility).
-
-    Each item is the same dict structure returned by :func:`load_puzzle`.
-    """
-    folder = Path(folder)
-    if not folder.is_dir():
-        raise PuzzleIOError(f"Batch folder not found: {folder}")
-    files = sorted(folder.glob("*.non.json"))
-    return [load_puzzle(f) for f in files]

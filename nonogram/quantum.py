@@ -13,7 +13,7 @@ Two execution paths are provided:
       Requires:  pip install qiskit-ibm-runtime
 
   list_backends(token, channel)
-      Helper used by the GUI settings dialog to enumerate available backends.
+      Enumerates the backends the account can reach, shortest queue first.
 
 Bitstring note
 --------------
@@ -83,10 +83,10 @@ def quantum_solve_hardware(  # noqa: PLR0913
 
     A few reference values for n = 9 (3 × 3 grid, 1 solution / 512 states):
 
-        k = 1 → P ≈  1.8 %   (barely above random ≈ 0.2 %)
+        k = 1 → P ≈  1.7 %   (barely above random ≈ 0.2 %)
         k = 3 → P ≈  9.3 %   ✓ passes the > 5 % hardware threshold
-        k = 5 → P ≈ 22.6 %
-        k = 9 → P ≈ 64.2 %
+        k = 5 → P ≈ 21.8 %
+        k = 9 → P ≈ 55.4 %
 
     More iterations amplify the signal but also deepen the circuit, making
     hardware noise worse.  ``iterations=3`` is a reasonable default for 9-qubit
@@ -114,8 +114,7 @@ def quantum_solve_hardware(  # noqa: PLR0913
 
     Returns:
         ``(counts_dict, backend_name)`` where *counts_dict* maps bitstring →
-        count, exactly as you'd pass to the GUI's ``_on_hw_qu_done``.
-        Reverse each bitstring key (``bs[::-1]``) to get the row-major grid.
+        count. Reverse each bitstring key (``bs[::-1]``) to get the row-major grid.
 
     Raises:
         ImportError:  if ``qiskit-ibm-runtime`` is not installed.
@@ -192,20 +191,11 @@ def quantum_solve_hardware(  # noqa: PLR0913
     return counts, backend.name
 
 
-# Defensive parser across six qiskit result-format generations; each branch is
-# one probe, so the branch budget is waived here rather than raised globally.
-def extract_counts(data, creg_names: list[str]) -> dict[str, int]:  # noqa: C901, PLR0912
+def extract_counts(data, creg_names: list[str]) -> dict[str, int]:
     """Extract measurement counts from a Qiskit DataBin.
 
-    IBM's DataBin format varies across qiskit-ibm-runtime versions.
-    This function tries six discovery strategies in priority order:
-
-      1. Circuit classical register names (IBM recommended)
-      2. ``data._fields`` (Qiskit 2.x DataBin)
-      3. ``data.keys()`` (dict-like interface)
-      4. ``dataclasses.fields()`` (proper dataclass)
-      5. ``dir()`` scan (brute-force public attribute scan)
-      6. Hard-coded common register names (safety net)
+    The BitArray is found by name where the transpiled circuit reports one, and by
+    scanning the DataBin's public attributes where it does not.
 
     Parameters
     ----------
@@ -221,74 +211,29 @@ def extract_counts(data, creg_names: list[str]) -> dict[str, int]:  # noqa: C901
 
     Raises
     ------
-    RuntimeError
-        If no strategy yields a valid BitArray with ``.get_counts()``.
+    QuantumSolverError
+        If no attribute yields a BitArray with ``.get_counts()``.
     """
-    import dataclasses as _dc
 
-    bit_array = None
-
-    def _try(attr_name: str) -> bool:
-        nonlocal bit_array
+    def _bit_array(attr_name: str):
         candidate = getattr(data, attr_name, None)
-        if candidate is not None and hasattr(candidate, "get_counts"):
-            bit_array = candidate
-            return True
-        return False
+        return candidate if hasattr(candidate, "get_counts") else None
 
-    # 1. Circuit classical register names (IBM recommended)
-    for cname in creg_names:
-        if _try(cname):
-            break
+    names = [*creg_names, *getattr(data, "_fields", ()), *_public_attrs(data)]
+    for name in names:
+        found = _bit_array(name)
+        if found is not None:
+            return found.get_counts()
 
-    # 2. data._fields (Qiskit 2.x DataBin)
-    if bit_array is None and hasattr(data, "_fields"):
-        for fname in data._fields:
-            if _try(fname):
-                break
+    raise QuantumSolverError(
+        f"Could not extract measurement counts from DataBin.\n"
+        f"Circuit classical registers:  {creg_names}\n"
+        f"DataBin public attributes:    {_public_attrs(data)[:30]}"
+    )
 
-    # 3. data.keys() (dict-like interface)
-    if bit_array is None and hasattr(data, "keys") and callable(data.keys):
-        for fname in data:
-            if _try(fname):
-                break
 
-    # 4. dataclasses.fields()
-    if bit_array is None:
-        try:
-            for field in _dc.fields(data):
-                if _try(field.name):
-                    break
-        except TypeError:
-            pass
-
-    # 5. dir() scan
-    if bit_array is None:
-        for attr in dir(data):
-            if not attr.startswith("_") and _try(attr):
-                break
-
-    # 6. Hard-coded common register names
-    if bit_array is None:
-        for name in ("meas", "c", "c0", "measure", "m"):
-            if name not in creg_names and _try(name):
-                break
-
-    if bit_array is None:
-        _discovered: list[str] = [
-            f"{attr}={getattr(data, attr)!r}"
-            for attr in ("_fields", "__dataclass_fields__")
-            if hasattr(data, attr)
-        ]
-        _public = [a for a in dir(data) if not a.startswith("_")]
-        raise QuantumSolverError(
-            f"Could not extract measurement counts from DataBin.\n"
-            f"Circuit classical registers:  {creg_names}\n"
-            f"DataBin introspection:        {_discovered or ['none found']}\n"
-            f"DataBin public attributes:    {_public[:30]}"
-        )
-
-    return bit_array.get_counts()
+def _public_attrs(data) -> list[str]:
+    return [a for a in dir(data) if not a.startswith("_")]
 
 
 # Backend enumeration helper (used by the GUI settings dialog)

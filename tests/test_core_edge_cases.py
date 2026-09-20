@@ -2,15 +2,7 @@
 
 import pytest
 
-from nonogram.core import (
-    display_nonogram,
-    grid_to_clues,
-    parse_clue,
-    puzzle_to_boolean,
-    rle,
-    validate,
-    var_clauses,
-)
+from nonogram.core import display_nonogram, puzzle_to_boolean, rle, var_clauses
 from nonogram.errors import ValidationError
 
 
@@ -34,23 +26,10 @@ class TestVarClausesEdgeCases:
         assert len(col_vars) == 1
         assert col_vars[0] == [0, 1, 2, 3, 4]
 
-    def test_6x6_max_grid(self):
-        row_vars, _col_vars = var_clauses(6, 6)
+    def test_largest_supported_grid(self):
+        row_vars, _col_vars = var_clauses(10, 10)
         flat = [v for row in row_vars for v in row]
-        assert flat == list(range(36))
-
-
-class TestValidateEdgeCases:
-    def test_single_row_col(self):
-        assert validate(1, 1, [(1,)], [(1,)]) is True
-
-    def test_zero_clues_raises(self):
-        with pytest.raises(ValidationError):
-            validate(1, 1, [], [(1,)])
-
-    def test_extra_clues_raises(self):
-        with pytest.raises(ValidationError):
-            validate(1, 1, [(1,), (1,)], [(1,)])
+        assert flat == list(range(100))
 
 
 class TestDisplayNonogramEdgeCases:
@@ -95,40 +74,6 @@ class TestRleEdgeCases:
 
     def test_trailing_false(self):
         assert rle([True, True, False, False]) == (2,)
-
-
-class TestGridToCluesEdgeCases:
-    def test_1x1_filled(self):
-        row_clues, col_clues = grid_to_clues([[True]])
-        assert row_clues == [(1,)]
-        assert col_clues == [(1,)]
-
-    def test_1x1_empty(self):
-        row_clues, col_clues = grid_to_clues([[False]])
-        assert row_clues == [(0,)]
-        assert col_clues == [(0,)]
-
-    def test_empty_grid(self):
-        row_clues, col_clues = grid_to_clues([])
-        assert row_clues == []
-        assert col_clues == []
-
-
-class TestParseClueEdgeCases:
-    def test_single_zero(self):
-        assert parse_clue("0") == (0,)
-
-    def test_multiple_zeros(self):
-        assert parse_clue("0 0 0") == (0,)
-
-    def test_whitespace_only(self):
-        assert parse_clue("   ") == (0,)
-
-    def test_non_numeric(self):
-        assert parse_clue("abc") == (0,)
-
-    def test_mixed_valid_numbers(self):
-        assert parse_clue("3 1 2") == (3, 1, 2)
 
 
 class TestPuzzleToBooleanEdgeCases:

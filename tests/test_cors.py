@@ -1,68 +1,88 @@
-"""CORS header tests for the nonogram Flask API."""
+"""CORS tests for the nonogram Flask API.
+
+These run against the deployed app object and its real allowlist. A test-local
+``CORS(app)`` would allow every origin, so it would pass whatever the app config
+said — including the unanchored pattern that once admitted registrable domains
+beginning with "localhost".
+"""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 import pytest
-from flask import Flask
-from flask_cors import CORS
-from flask_socketio import SocketIO
 
-from tools import state as app_state
-from tools.routes import ALL_BLUEPRINTS
+from tools.webapp import _socketio_origin_ok, app
+
+ALLOWED = [
+    "https://andypeterson.dev",
+    "http://localhost",
+    "http://localhost:3000",
+    "https://localhost:8443",
+]
+
+REFUSED = [
+    "http://localhostevil.com",
+    "https://andypeterson.dev.evil.example",
+    "https://evil.example",
+]
 
 
 @pytest.fixture()
 def client():
-    app = Flask(
-        __name__,
-        template_folder=str(Path(__file__).resolve().parent.parent / "tools" / "templates"),
-        static_folder=str(Path(__file__).resolve().parent.parent / "tools" / "static"),
-    )
     app.config["TESTING"] = True
-    app.config["SECRET_KEY"] = "test"
-    CORS(app)
-    sio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
-    app_state.init(sio)
-    for bp in ALL_BLUEPRINTS:
-        app.register_blueprint(bp)
-    app_state.state.update(
-        {
-            "rows": 3,
-            "cols": 3,
-            "grid": [[False] * 3 for _ in range(3)],
-            "hw_config": None,
-            "busy": False,
-            "puzzle_name": "test",
-        }
-    )
-    yield app.test_client()
+    return app.test_client()
 
 
-class TestCORS:
-    def test_cors_headers_on_post(self, client):
+class TestAllowedOrigins:
+    @pytest.mark.parametrize("origin", ALLOWED)
+    def test_post_carries_the_origin_back(self, client, origin):
         res = client.post(
             "/api/grid",
             json={"rows": 3, "cols": 3, "grid": [[False] * 3] * 3},
-            headers={"Origin": "https://andypeterson2.github.io"},
+            headers={"Origin": origin},
         )
-        assert res.headers.get("Access-Control-Allow-Origin") is not None
+        assert res.headers.get("Access-Control-Allow-Origin") == origin
 
-    def test_options_preflight(self, client):
+    @pytest.mark.parametrize("origin", ALLOWED)
+    def test_preflight_succeeds(self, client, origin):
         res = client.options(
             "/api/grid",
-            headers={
-                "Origin": "https://andypeterson2.github.io",
-                "Access-Control-Request-Method": "POST",
-            },
+            headers={"Origin": origin, "Access-Control-Request-Method": "POST"},
         )
         assert res.status_code == 200
-        assert "Access-Control-Allow-Origin" in res.headers
+        assert res.headers.get("Access-Control-Allow-Origin") == origin
 
-    def test_cors_on_get(self, client):
-        res = client.get("/api/runs/info", headers={"Origin": "https://andypeterson2.github.io"})
-        assert res.headers.get("Access-Control-Allow-Origin") is not None
+    @pytest.mark.parametrize("origin", ALLOWED)
+    def test_get_carries_the_origin_back(self, client, origin):
+        res = client.get("/api/runs/info", headers={"Origin": origin})
+        assert res.headers.get("Access-Control-Allow-Origin") == origin
+
+
+class TestRefusedOrigins:
+    @pytest.mark.parametrize("origin", REFUSED)
+    def test_no_allow_origin_header(self, client, origin):
+        res = client.post(
+            "/api/grid",
+            json={"rows": 3, "cols": 3, "grid": [[False] * 3] * 3},
+            headers={"Origin": origin},
+        )
+        assert res.headers.get("Access-Control-Allow-Origin") is None
+
+    @pytest.mark.parametrize("origin", REFUSED)
+    def test_preflight_carries_no_allow_origin(self, client, origin):
+        res = client.options(
+            "/api/grid",
+            headers={"Origin": origin, "Access-Control-Request-Method": "POST"},
+        )
+        assert res.headers.get("Access-Control-Allow-Origin") is None
+
+
+class TestSocketIOOriginCheck:
+    """python-socketio exact-matches plain strings, so the regex entries need a callable."""
+
+    @pytest.mark.parametrize("origin", ALLOWED)
+    def test_allowed(self, origin):
+        assert _socketio_origin_ok(origin) is True
+
+    @pytest.mark.parametrize("origin", REFUSED)
+    def test_refused(self, origin):
+        assert _socketio_origin_ok(origin) is False

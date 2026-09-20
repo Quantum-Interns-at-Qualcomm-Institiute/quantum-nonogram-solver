@@ -1,4 +1,10 @@
-"""Tests for nonogram.data — validate the precomputed lookup table possible_d."""
+"""Tests for nonogram.data — validate the precomputed lookup table possible_d.
+
+The table is generated, so a fault in it is a fault in the generator and shows up
+across many keys at once. Whole-table checks therefore loop over the keys inside
+one test and name the offending key in the assertion, rather than parametrizing
+374 keys into 374 cases; only the per-length checks are parametrized.
+"""
 
 import re
 
@@ -6,6 +12,7 @@ import pytest
 
 from nonogram.core import rle
 from nonogram.data import possible_d
+from nonogram.io import _MAX_LINE
 
 # The key format regex: "length/clue;clue;...;" where length and clues are ints.
 KEY_PATTERN = re.compile(r"^(\d+)/((?:\d+;)+)$")
@@ -67,11 +74,11 @@ class TestKeyFormat:
                 assert c >= 0, f"Key has negative clue value: {key!r}"
 
 
-# 2. Coverage of lengths 1-6
+# 2. Coverage of every length the table is built for
 
 
 class TestLengthCoverage:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_length_present(self, length):
         keys_for_length = [k for k in possible_d if k.startswith(f"{length}/")]
         assert len(keys_for_length) > 0, (
@@ -83,34 +90,34 @@ class TestLengthCoverage:
 
 
 class TestBitstringSatisfiesClue:
-    @pytest.mark.parametrize("key", list(possible_d.keys()))
-    def test_all_patterns_match_clue(self, key):
-        length, clue = _parse_key(key)
-        for pattern in possible_d[key]:
-            computed_clue = _rle_from_int(pattern, length)
-            assert computed_clue == clue, (
-                f"Key {key!r}: pattern {pattern:#0{length + 2}b} "
-                f"has RLE {computed_clue}, expected {clue}"
-            )
+    def test_all_patterns_match_clue(self):
+        """Every pattern in the table run-length encodes to the clue in its key."""
+        for key in possible_d:
+            length, clue = _parse_key(key)
+            for pattern in possible_d[key]:
+                computed_clue = _rle_from_int(pattern, length)
+                assert computed_clue == clue, (
+                    f"Key {key!r}: pattern {pattern:#0{length + 2}b} "
+                    f"has RLE {computed_clue}, expected {clue}"
+                )
 
 
 # 4. No duplicate patterns within a key
 
 
 class TestNoDuplicatePatterns:
-    @pytest.mark.parametrize("key", list(possible_d.keys()))
-    def test_no_duplicates(self, key):
-        patterns = possible_d[key]
-        assert len(patterns) == len(set(patterns)), (
-            f"Key {key!r} contains duplicate patterns"
-        )
+    def test_no_duplicates(self):
+        for key, patterns in possible_d.items():
+            assert len(patterns) == len(set(patterns)), (
+                f"Key {key!r} contains duplicate patterns"
+            )
 
 
 # 5. Empty clue (0,) for each length has exactly one pattern (all zeros)
 
 
 class TestEmptyClue:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_empty_clue_single_zero_pattern(self, length):
         key = f"{length}/0;"
         assert key in possible_d, f"Missing empty clue key: {key!r}"
@@ -127,7 +134,7 @@ class TestEmptyClue:
 
 
 class TestFullClue:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_full_clue_single_all_ones_pattern(self, length):
         key = f"{length}/{length};"
         assert key in possible_d, f"Missing full clue key: {key!r}"
@@ -146,7 +153,7 @@ class TestFullClue:
 
 
 class TestPatternCompleteness:
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_exhaustive_completeness(self, length):
         """For each length, exhaustively check all 2^length bitstrings.
 
@@ -163,7 +170,7 @@ class TestPatternCompleteness:
                 f"Pattern {bitstring:#0{length + 2}b} missing from {key!r}"
             )
 
-    @pytest.mark.parametrize("length", [1, 2, 3, 4, 5, 6])
+    @pytest.mark.parametrize("length", range(1, _MAX_LINE + 1))
     def test_no_extra_patterns(self, length):
         """Verify the table has no patterns beyond what exhaustive enumeration produces."""
         # Build expected mapping from exhaustive enumeration
@@ -193,13 +200,13 @@ class TestPatternCompleteness:
 
 
 class TestCrossReferenceRle:
-    @pytest.mark.parametrize("key", list(possible_d.keys()))
-    def test_core_rle_matches_table(self, key):
+    def test_core_rle_matches_table(self):
         """For every pattern, verify core.rle() produces the clue in the key."""
-        length, clue = _parse_key(key)
-        for pattern in possible_d[key]:
-            bits = _bitstring_to_bits(pattern, length)
-            assert rle(bits) == clue, (
-                f"Key {key!r}: core.rle({bits}) returned {rle(bits)}, "
-                f"expected {clue}"
-            )
+        for key in possible_d:
+            length, clue = _parse_key(key)
+            for pattern in possible_d[key]:
+                bits = _bitstring_to_bits(pattern, length)
+                assert rle(bits) == clue, (
+                    f"Key {key!r}: core.rle({bits}) returned {rle(bits)}, "
+                    f"expected {clue}"
+                )

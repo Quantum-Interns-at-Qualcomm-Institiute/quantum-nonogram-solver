@@ -1,15 +1,14 @@
 """
 test_hardware_parsing.py
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Two targeted tests for the IBM hardware integration:
+Tests for the IBM hardware integration:
 
   test_databin_parsing_logic
-      Verifies the DataBin extraction logic with a mock object — exercises
-      exactly the same code path as quantum_solve_hardware without making
-      any API calls or running any circuits.
+      Calls extract_counts with mock DataBins — the same function
+      quantum_solve_hardware uses, with no API calls and no circuits.
 
   test_list_backends_auth
-      Authenticates against IBM Quantum Platform using the token in .env
+      Authenticates against IBM Quantum Platform using IBM_QUANTUM_TOKEN
       and confirms the backend-listing REST call succeeds.
       Makes exactly ONE API call.  No circuits are run, no compute credits
       are consumed.
@@ -20,78 +19,57 @@ import dataclasses
 import pytest
 from conftest import load_ibm_token
 
+from nonogram.errors import QuantumSolverError
+from nonogram.quantum import extract_counts
+
 # Test 1: DataBin parsing logic (ZERO API cost — pure Python mock)
 
 
-def test_databin_parsing_logic():
-    """The extraction loop in quantum_solve_hardware must handle any field name.
+class _FakeBitArray:
+    def __init__(self, counts):
+        self._counts = counts
 
-    Simulates two DataBin scenarios:
-      a) field named "meas"  — the typical case from measure_all()
-      b) field named "c"     — as seen in some runtime / transpilation combos
+    def get_counts(self):
+        return dict(self._counts)
 
-    Both should yield the injected counts dict without error.
+
+@pytest.mark.parametrize(
+    "field_name,creg_names",
+    [
+        ("meas", ["meas"]),
+        ("c", ["c"]),
+        ("measure", []),
+        ("m", []),
+    ],
+    ids=["named-meas", "named-c", "discovered-measure", "discovered-m"],
+)
+def test_databin_parsing_logic(field_name, creg_names):
+    """extract_counts finds the BitArray whatever the DataBin calls its field.
+
+    The register name comes from the transpiled circuit when the runtime reports one,
+    and is discovered from the object otherwise.
     """
-
-    # Build a fake BitArray with get_counts()
-    class _FakeBitArray:
-        def __init__(self, counts):
-            self._counts = counts
-
-        def get_counts(self):
-            return dict(self._counts)
-
-    # Build a fake DataBin as a plain dataclass (same interface as the real one)
-    def _run_extraction(field_name: str, expected_counts: dict) -> dict:
-        DataBinCls = dataclasses.make_dataclass("DataBin", [(field_name, object)])
-        data = DataBinCls(**{field_name: _FakeBitArray(expected_counts)})
-
-        # same logic as quantum_solve_hardware
-        counts = None
-        try:
-            fields = dataclasses.fields(data)
-        except TypeError:
-            fields = []
-
-        for field in fields:
-            candidate = getattr(data, field.name, None)
-            if candidate is not None and hasattr(candidate, "get_counts"):
-                counts = candidate.get_counts()
-                break
-
-        if counts is None:
-            for name in ("meas", "c", "c0", "measure", "m"):
-                candidate = getattr(data, name, None)
-                if candidate is not None and hasattr(candidate, "get_counts"):
-                    counts = candidate.get_counts()
-                    break
-
-        return counts
-
-    # Scenario a: "meas" register (standard)
     expected = {"0101": 80, "1010": 48}
-    result = _run_extraction("meas", expected)
-    assert result == expected, f"'meas' extraction failed: {result}"
-    print("✓  Field 'meas' extracted correctly.")
+    data_bin_cls = dataclasses.make_dataclass("DataBin", [(field_name, object)])
+    data = data_bin_cls(**{field_name: _FakeBitArray(expected)})
 
-    # Scenario b: "c" register (seen with some backends/transpilation)
-    expected2 = {"001": 100, "110": 28}
-    result2 = _run_extraction("c", expected2)
-    assert result2 == expected2, f"'c' extraction failed: {result2}"
-    print("✓  Field 'c' extracted correctly.")
+    assert extract_counts(data, creg_names) == expected
 
-    # Scenario c: unusual name "measure"
-    expected3 = {"1111": 64}
-    result3 = _run_extraction("measure", expected3)
-    assert result3 == expected3, f"'measure' extraction failed: {result3}"
-    print("✓  Field 'measure' extracted correctly.")
 
-    print("✓  DataBin parsing logic handles all register-name variants.")
+def test_databin_without_a_bit_array_reports_what_it_saw():
+    """A DataBin no strategy can read raises, and names the fields it inspected."""
+
+    class _Empty:
+        pass
+
+    with pytest.raises(QuantumSolverError, match="Could not extract"):
+        extract_counts(_Empty(), ["meas"])
 
 
 # Test 2: list_backends() auth (1 REST call, zero compute cost)
 
 
+@pytest.mark.hardware
 @pytest.mark.skipif(
     load_ibm_token() is None,
     reason="IBM_QUANTUM_TOKEN env var not set and .env not found",

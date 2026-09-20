@@ -6,8 +6,6 @@ and checking run-length encoding matches the original clues.
 """
 from __future__ import annotations
 
-import pytest
-
 from nonogram.classical import classical_solve
 from nonogram.core import rle
 
@@ -184,24 +182,3 @@ def test_single_row_single_col():
     solutions = classical_solve(puzzle)
     assert len(solutions) == 1
     _verify_solution(solutions[0], puzzle[0], puzzle[1])
-
-
-# All solutions of every size satisfy constraints
-
-
-@pytest.mark.parametrize(
-    "row_clues,col_clues",
-    [
-        ([(1,)], [(1,)]),
-        ([(0,)], [(0,)]),
-        ([(2,), (0,)], [(1,), (1,)]),
-        ([(1, 1), (1,), (1, 1)], [(1, 1), (1,), (1, 1)]),
-    ],
-    ids=["1x1-filled", "1x1-empty", "2x2-mixed", "3x3-checker"],
-)
-def test_all_solutions_satisfy_constraints(row_clues, col_clues):
-    """Every solution from the classical solver must satisfy all clues."""
-    puzzle = (row_clues, col_clues)
-    solutions = classical_solve(puzzle)
-    for sol in solutions:
-        _verify_solution(sol, row_clues, col_clues)

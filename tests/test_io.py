@@ -1,21 +1,19 @@
 """
 tests/test_io.py
 ~~~~~~~~~~~~~~~~
-Unit tests for nonogram.io — save_puzzle, load_puzzle, save_batch, load_batch.
+Unit tests for nonogram.io — save_puzzle and load_puzzle.
 
-These tests are headless (no tkinter) and cover:
+Covers:
   * Happy-path save/load roundtrips
-  * Validation rejections (negative values, oversized puzzles)
-  * Batch save/load roundtrips
+  * Validation rejections (bad shapes, negative values, oversized puzzles)
   * Edge-case clue shapes (empty rows encoded as (0,), multi-group clues)
-  * File-system error conditions (missing file, missing directory)
+  * File-system error conditions (missing file)
   * Internal helpers: _slugify, _to_serialisable
 """
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -24,9 +22,7 @@ from nonogram.io import (
     _slugify,
     _to_serialisable,
     _validate_clues,
-    load_batch,
     load_puzzle,
-    save_batch,
     save_puzzle,
 )
 
@@ -247,6 +243,26 @@ class TestLoadPuzzle:
         assert loaded["rows"] == len(SIMPLE_ROW_CLUES)
         assert loaded["cols"] == len(SIMPLE_COL_CLUES)
 
+    @pytest.mark.parametrize(
+        "document",
+        [
+            [1, 2],
+            {"col_clues": [[1]]},
+            {"row_clues": 5, "col_clues": [[1]]},
+            {"row_clues": [1], "col_clues": [[1]]},
+            {"row_clues": [[-5]], "col_clues": [[1]]},
+            {"row_clues": [["zz"]], "col_clues": [[1]]},
+            {"row_clues": [[1]] * 11, "col_clues": [[1]] * 11},
+        ],
+        ids=["list", "missing", "scalar", "flat", "negative", "string", "oversized"],
+    )
+    def test_malformed_documents_raise(self, tmp_path, document):
+        """A caller can size a grid from the result, so the shape is checked on load."""
+        dest = tmp_path / "bad.non.json"
+        dest.write_text(json.dumps(document))
+        with pytest.raises(ValueError):
+            load_puzzle(dest)
+
     def test_missing_optional_keys_get_defaults(self, tmp_path):
         dest = tmp_path / "bare.non.json"
         dest.write_text(
@@ -308,106 +324,3 @@ class TestSaveLoadRoundtrip:
         c = [tuple(c) for c in data["col_clues"]]
         solutions = classical_solve((r, c))
         assert len(solutions) > 0
-
-
-# save_batch / load_batch
-
-BATCH_PUZZLES = [
-    {"name": "Alpha", "row_clues": [(1,), (1,)], "col_clues": [(1,), (1,)]},
-    {"name": "Beta", "row_clues": [(2,), (0,)], "col_clues": [(1,), (1,)]},
-    {"name": "Gamma", "row_clues": [(1, 1), (0,)], "col_clues": [(1,), (1,)]},
-]
-
-
-class TestSaveBatch:
-    def test_creates_correct_number_of_files(self, tmp_path):
-        written = save_batch(BATCH_PUZZLES, tmp_path)
-        assert len(written) == len(BATCH_PUZZLES)
-
-    def test_all_files_exist(self, tmp_path):
-        written = save_batch(BATCH_PUZZLES, tmp_path)
-        for p in written:
-            assert Path(p).exists()
-
-    def test_files_have_non_json_extension(self, tmp_path):
-        written = save_batch(BATCH_PUZZLES, tmp_path)
-        for p in written:
-            assert str(p).endswith(".non.json")
-
-    def test_creates_folder_if_missing(self, tmp_path):
-        folder = tmp_path / "new_folder"
-        save_batch(BATCH_PUZZLES, folder)
-        assert folder.is_dir()
-
-    def test_returns_paths_list(self, tmp_path):
-        result = save_batch(BATCH_PUZZLES, tmp_path)
-        assert isinstance(result, list)
-        assert all(isinstance(p, Path) for p in result)
-
-    def test_filenames_include_index_suffix(self, tmp_path):
-        written = save_batch(BATCH_PUZZLES, tmp_path)
-        names = [p.name for p in written]
-        assert any("_000.non.json" in n for n in names)
-        assert any("_001.non.json" in n for n in names)
-
-    def test_batch_with_dict_row_col_lists(self, tmp_path):
-        """save_batch must accept list-of-lists, not just list-of-tuples."""
-        puzzles = [
-            {"name": "X", "row_clues": [[1], [1]], "col_clues": [[1], [1]]},
-        ]
-        written = save_batch(puzzles, tmp_path)
-        assert len(written) == 1
-
-    def test_empty_batch_writes_nothing(self, tmp_path):
-        written = save_batch([], tmp_path)
-        assert written == []
-
-
-class TestLoadBatch:
-    def test_loads_all_files(self, tmp_path):
-        save_batch(BATCH_PUZZLES, tmp_path)
-        loaded = load_batch(tmp_path)
-        assert len(loaded) == len(BATCH_PUZZLES)
-
-    def test_each_entry_is_dict(self, tmp_path):
-        save_batch(BATCH_PUZZLES, tmp_path)
-        loaded = load_batch(tmp_path)
-        assert all(isinstance(p, dict) for p in loaded)
-
-    def test_sorted_by_filename(self, tmp_path):
-        save_batch(BATCH_PUZZLES, tmp_path)
-        loaded = load_batch(tmp_path)
-        names = [p["name"] for p in loaded]
-        assert names == sorted(names) or len(names) == len(BATCH_PUZZLES)  # sorted determinism
-
-    def test_missing_directory_raises(self, tmp_path):
-        with pytest.raises(PuzzleIOError):
-            load_batch(tmp_path / "no_such_dir")
-
-    def test_ignores_non_non_json_files(self, tmp_path):
-        save_batch(BATCH_PUZZLES, tmp_path)
-        (tmp_path / "readme.txt").write_text("ignore me")
-        (tmp_path / "other.json").write_text('{"not": "a puzzle"}')
-        loaded = load_batch(tmp_path)
-        assert len(loaded) == len(BATCH_PUZZLES)
-
-
-class TestSaveBatchLoadBatchRoundtrip:
-    def test_clues_survive_roundtrip(self, tmp_path):
-        save_batch(BATCH_PUZZLES, tmp_path)
-        loaded = load_batch(tmp_path)
-        loaded_names = {p["name"] for p in loaded}
-        for original in BATCH_PUZZLES:
-            assert original["name"] in loaded_names
-
-    def test_solver_can_use_batch_loaded_clues(self, tmp_path):
-        from nonogram.classical import classical_solve
-
-        puzzles = [{"name": "T", "row_clues": [(1,), (1,)], "col_clues": [(1,), (1,)]}]
-        save_batch(puzzles, tmp_path)
-        loaded = load_batch(tmp_path)
-        for p in loaded:
-            r = [tuple(row) for row in p["row_clues"]]
-            c = [tuple(col) for col in p["col_clues"]]
-            solutions = classical_solve((r, c))
-            assert len(solutions) > 0

@@ -51,9 +51,6 @@ class ClassicalMetrics:
     literal_evaluations: int = 0
     """Total individual literal evaluations."""
 
-    constraint_checks: int = 0
-    """Total constraint checks (alias for clause_evaluations)."""
-
     early_terminations: int = 0
     """Candidates rejected before evaluating all clauses."""
 
@@ -254,9 +251,6 @@ class HardwareRequirements:
     max_gate_error_rate: float = field(init=False)
     """Rough upper bound on tolerable per-gate error rate (1/total_gates)."""
 
-    break_even_search_space: int = 0
-    """Search space size where quantum oracle calls < classical constraint checks."""
-
     def __post_init__(self) -> None:
         gate_time_ns = 50  # typical single-gate time on superconducting hardware
         self.estimated_coherence_us = self.circuit_depth * gate_time_ns / 1000
@@ -404,22 +398,11 @@ def compute_solution_space_metrics(
     )
 
 
-def estimate_hardware_requirements(
-    static: StaticCircuitAnalysis,
-    classical_constraint_checks: int = 0,
-) -> HardwareRequirements:
+def estimate_hardware_requirements(static: StaticCircuitAnalysis) -> HardwareRequirements:
     """Estimate hardware requirements from static circuit analysis."""
-    # Break-even: find N where sqrt(N) iterations < classical constraint checks
-    break_even = 0
-    if classical_constraint_checks > 0 and static.grover_iterations > 0:
-        # Grover oracle calls scale as sqrt(N); classical as N
-        # Break-even when sqrt(N) = classical_checks → N = classical_checks^2
-        break_even = classical_constraint_checks ** 2
-
     return HardwareRequirements(
         circuit_depth=static.circuit_depth,
         total_gate_count=static.total_gate_count,
-        break_even_search_space=break_even,
     )
 
 
@@ -491,9 +474,8 @@ def benchmark(  # noqa: PLR0915
 
     Warning:
         The classical solver is O(2^(n*d)).  For the 4×6 demo puzzle (24
-        variables) it takes ~18 minutes.  Use ``run_classical=False`` and
-        supply ``classical_override`` if you already have timing data, or
-        choose a smaller puzzle for interactive benchmarking.
+        variables) it takes ~18 minutes.  Pass ``run_classical=False`` or choose a
+        smaller puzzle for interactive benchmarking.
     """
     row_clues, col_clues = puzzle
     n, d = len(row_clues), len(col_clues)
@@ -538,7 +520,6 @@ def benchmark(  # noqa: PLR0915
             clause_evaluations=exec_counts.clause_evaluations,
             subclause_evaluations=exec_counts.subclause_evaluations,
             literal_evaluations=exec_counts.literal_evaluations,
-            constraint_checks=exec_counts.constraint_checks,
             early_terminations=exec_counts.early_terminations,
         )
 
@@ -620,8 +601,7 @@ def benchmark(  # noqa: PLR0915
 
     # Hardware requirements
     if static_circuit:
-        cl_checks = classical_metrics.constraint_checks if classical_metrics else 0
-        hw_reqs = estimate_hardware_requirements(static_circuit, cl_checks)
+        hw_reqs = estimate_hardware_requirements(static_circuit)
 
     return ComparisonReport(
         rows=n,
@@ -777,14 +757,10 @@ def print_report(report: ComparisonReport) -> None:  # noqa: C901, PLR0915
         print(row("Oracle call reduction", "", f"{reduction:.1f}%"))
 
         # Execution count comparison
-        if c.constraint_checks > 0:
-            print(row("Classical constraint checks", f"{c.constraint_checks:,}", ""))
+        if c.clause_evaluations > 0:
+            print(row("Classical constraint checks", f"{c.clause_evaluations:,}", ""))
             print(row("Quantum oracle calls", "", f"{grover_oracle:,}"))
-            check_reduction = (
-                (1 - grover_oracle / c.constraint_checks) * 100
-                if c.constraint_checks
-                else 0
-            )
+            check_reduction = (1 - grover_oracle / c.clause_evaluations) * 100
             print(row("Constraint check reduction", "", f"{check_reduction:.1f}%"))
 
     print(f"\n{'═' * 64}\n")

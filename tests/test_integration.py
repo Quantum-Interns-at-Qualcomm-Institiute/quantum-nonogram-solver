@@ -5,7 +5,7 @@ SAT encoding, solving (both classical and quantum), and result validation.
 """
 
 from nonogram.classical import classical_solve
-from nonogram.core import grid_to_clues, puzzle_to_boolean, validate
+from nonogram.core import puzzle_to_boolean, rle
 from nonogram.metrics import benchmark
 from nonogram.quantum import quantum_solve
 
@@ -16,14 +16,8 @@ class TestFullPipelineClassical:
     def test_2x2_roundtrip(self):
         """Define a 2x2 grid, extract clues, solve, verify solution matches."""
         # Define a grid: top-left filled, rest empty
-        grid = [[True, False], [False, False]]
-        row_clues, col_clues = grid_to_clues(grid)
-
-        assert row_clues == [(1,), (0,)]
-        assert col_clues == [(1,), (0,)]
-
+        row_clues, col_clues = [(1,), (0,)], [(1,), (0,)]
         puzzle = (row_clues, col_clues)
-        validate(2, 2, row_clues, col_clues)
 
         solutions = classical_solve(puzzle)
         # The expected bitstring (variable order, reversed)
@@ -133,12 +127,8 @@ class TestSATEncodingIntegration:
 
         # Verify each solution satisfies the constraints by re-checking
         for sol in solutions:
-            # Reconstruct grid from bitstring
             grid = [[sol[i * 2 + j] == "1" for j in range(2)] for i in range(2)]
-            row_clues, col_clues = grid_to_clues(grid)
-            # Check row clues match
-            for actual, expected in zip(row_clues, puzzle[0], strict=True):
-                assert actual == expected
-            # Check col clues match
-            for actual, expected in zip(col_clues, puzzle[1], strict=True):
-                assert actual == expected
+            for r, expected in enumerate(puzzle[0]):
+                assert rle(grid[r]) == expected
+            for c, expected in enumerate(puzzle[1]):
+                assert rle([grid[r][c] for r in range(2)]) == expected

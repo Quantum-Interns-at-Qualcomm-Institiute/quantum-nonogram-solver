@@ -1,7 +1,16 @@
 """Tests for tools.chart — report serialization and chart rendering."""
 
+import base64
+
+import pytest
+
 from nonogram.metrics import ClassicalMetrics, ComparisonReport, QuantumMetrics
-from tools.chart import render_chart_b64, report_to_dict
+from tools.chart import (
+    measurement_rows,
+    render_chart_b64,
+    render_histogram_b64,
+    report_to_dict,
+)
 
 
 def _make_report(include_classical=True, include_quantum=True):
@@ -93,13 +102,7 @@ class TestRenderChart:
     def test_renders_nonempty_base64(self):
         report = _make_report()
         b64 = render_chart_b64(report, [0.001], [0.5])
-        assert len(b64) > 0
-        # Should be valid base64
-        import base64
-
-        decoded = base64.b64decode(b64)
-        # PNG starts with these bytes
-        assert decoded[:4] == b"\x89PNG"
+        assert base64.b64decode(b64)[:4] == b"\x89PNG"
 
     def test_classical_only_chart(self):
         report = _make_report(include_quantum=False)
@@ -115,3 +118,40 @@ class TestRenderChart:
         report = _make_report()
         b64 = render_chart_b64(report, [0.001, 0.002, 0.003], [0.5, 0.6, 0.4])
         assert len(b64) > 0
+
+
+class TestMeasurementRows:
+    COUNTS = {"1001": 500, "0110": 400, "0000": 60, "1111": 64}
+
+    def test_ranked_most_likely_first(self):
+        rows = measurement_rows(self.COUNTS)
+        assert [r["count"] for r in rows] == [500, 400, 64, 60]
+
+    def test_grid_is_the_reversed_bitstring(self):
+        """Qiskit is little-endian; the grid reading is what a caller draws."""
+        rows = measurement_rows({"1000": 10})
+        assert rows[0] == {
+            "bitstring": "1000",
+            "grid": "0001",
+            "count": 10,
+            "probability": 1.0,
+        }
+
+    def test_probabilities_are_shares_of_the_total(self):
+        rows = measurement_rows(self.COUNTS)
+        assert sum(r["probability"] for r in rows) == pytest.approx(1.0)
+
+    def test_top_n_truncates(self):
+        assert len(measurement_rows(self.COUNTS, top_n=2)) == 2
+
+    def test_empty_counts(self):
+        assert measurement_rows({}) == []
+
+
+class TestRenderHistogram:
+    def test_renders_a_png(self):
+        b64 = render_histogram_b64({"1001": 500, "0110": 400})
+        assert base64.b64decode(b64)[:4] == b"\x89PNG"
+
+    def test_empty_counts_render_nothing(self):
+        assert render_histogram_b64({}) == ""

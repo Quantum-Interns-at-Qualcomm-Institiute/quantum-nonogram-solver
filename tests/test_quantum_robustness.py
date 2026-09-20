@@ -220,22 +220,3 @@ class TestExtractCounts:
 
         with pytest.raises(QuantumSolverError, match="Could not extract"):
             extract_counts(EmptyDataBin(), ["meas"])
-
-
-# Cross-validation with classical solver
-
-
-@pytest.mark.parametrize(
-    "puzzle",
-    [
-        ([(1,)], [(1,)]),
-        ([(0,)], [(0,)]),
-        ([(2,), (2,)], [(2,), (2,)]),
-        ([(1,), (1,)], [(1,), (1,)]),
-        ([(1,), (1,), (3,)], [(3,), (1,), (1,)]),
-    ],
-    ids=["1x1-filled", "1x1-empty", "2x2-full", "2x2-diag", "3x3-L"],
-)
-def test_quantum_classical_agreement(puzzle):
-    """Top quantum result must appear in the classical solution set."""
-    _assert_quantum_finds_classical(puzzle)

@@ -4,17 +4,14 @@ Core SAT encoding and puzzle manipulation for nonogram solving.
 This module provides:
 
   - **Variable indexing**: Map grid cells to boolean variables for SAT formulas
-  - **Validation**: Check that puzzle dimensions and clues are consistent
   - **Display**: Render solved grids in ASCII box-drawing format
-  - **Grid helpers**: Run-length encode, convert grids to clues, parse clue strings
+  - **Run-length encoding**: Turn a solved line back into its clue
   - **Boolean SAT encoding**: Convert nonogram puzzles to satisfiability formulas
 
 The SAT formulation is used by both the classical brute-force solver and the
 quantum Grover solver. Classical solver receives a CNF clause list; quantum
 solver receives a boolean expression string for oracle generation.
 """
-
-import numpy as np
 
 from nonogram.data import possible_d
 from nonogram.errors import ValidationError
@@ -50,48 +47,9 @@ def var_clauses(n: int, d: int | None = None) -> tuple[list[list[int]], list[lis
     """
     if d is None:
         d = n
-    X = np.arange(n * d).reshape((n, d))
-    row_vars = [list(X[row, :]) for row in range(n)]
-    col_vars = [list(X[:, col]) for col in range(d)]
+    row_vars = [[row * d + col for col in range(d)] for row in range(n)]
+    col_vars = [[row * d + col for row in range(n)] for col in range(d)]
     return row_vars, col_vars
-
-
-def validate(rows: int, cols: int, r_clues: list, c_clues: list) -> bool:
-    """Validate that puzzle dimensions match clue counts.
-
-    Raises ValueError if the number of row clues does not equal the row count,
-    or if the number of column clues does not equal the column count.
-
-    Parameters
-    ----------
-    rows : int
-        Expected number of rows.
-    cols : int
-        Expected number of columns.
-    r_clues : list
-        List of row clues (one per row).
-    c_clues : list
-        List of column clues (one per column).
-
-    Returns
-    -------
-    bool
-        True if validation passes.
-
-    Raises
-    ------
-    ValidationError
-        If clue counts do not match dimensions.
-    """
-    if len(r_clues) != rows:
-        raise ValidationError(
-            f"Number of row clues ({len(r_clues)}) does not match row count ({rows})"
-        )
-    if len(c_clues) != cols:
-        raise ValidationError(
-            f"Number of col clues ({len(c_clues)}) does not match col count ({cols})"
-        )
-    return True
 
 
 def display_nonogram(bit_string: str, n: int, d: int) -> None:
@@ -128,18 +86,12 @@ def display_nonogram(bit_string: str, n: int, d: int) -> None:
             f"bit_string length {len(bit_string)} is shorter than grid size {n * d}"
         )
 
-    puzzle_array = np.zeros((n, d))
-    for i in range(n):
-        for j in range(d):
-            puzzle_array[i, j] = int(bit_string[i * d + j])
-
     print("╔" + "═" * d + "╗")
     for i in range(n):
-        row = "║"
-        for j in range(d):
-            row += "■" if puzzle_array[i, j] else "□"
-        row += "║"
-        print(row)
+        cells = "".join(
+            "■" if bit_string[i * d + j] == "1" else "□" for j in range(d)
+        )
+        print(f"║{cells}║")
     print("╚" + "═" * d + "╝")
 
 
@@ -183,79 +135,6 @@ def rle(bits: list[bool]) -> tuple[int, ...]:
     if count:
         groups.append(count)
     return tuple(groups) if groups else (0,)
-
-
-def grid_to_clues(
-    grid: list[list[bool]],
-) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
-    """Compute row and column clues from a filled-cell grid.
-
-    This function is the inverse of the solver: given a completed grid, it extracts
-    the nonogram clues (block lengths) for each row and column. Useful for
-    exporting user-drawn puzzles or validating solved grids.
-
-    Parameters
-    ----------
-    grid : list[list[bool]]
-        2D grid where True = filled cell, False = empty cell.
-        Shape: (rows, cols).
-
-    Returns
-    -------
-    tuple[list[tuple[int, ...]], list[tuple[int, ...]]]
-        ``(row_clues, col_clues)`` where each clue is a tuple of contiguous
-        block lengths (run-length encoded via :func:`rle`).
-
-    Example
-    -------
-    >>> grid = [[True, False, True], [False, True, True]]
-    >>> row_clues, col_clues = grid_to_clues(grid)
-    >>> row_clues
-    [(1, 1), (2,)]
-    >>> col_clues
-    [(1,), (1, 1), (1,)]
-    """
-    rows = len(grid)
-    cols = len(grid[0]) if rows else 0
-    row_clues = [rle(grid[r]) for r in range(rows)]
-    col_clues = [rle([grid[r][c] for r in range(rows)]) for c in range(cols)]
-    return row_clues, col_clues
-
-
-def parse_clue(text: str) -> tuple[int, ...]:
-    """Parse a space-separated clue string into a tuple of block lengths.
-
-    Parses user input or file data into the tuple format expected by solvers.
-    Gracefully handles empty input and malformed values (returns (0,) for each).
-
-    Parameters
-    ----------
-    text : str
-        Space-separated integers, e.g., ``"1 2 3"`` or ``"2"``.
-        Whitespace is trimmed. Empty strings return (0,).
-
-    Returns
-    -------
-    tuple[int, ...]
-        Block lengths, or (0,) if input is empty or all values are invalid.
-
-    Example
-    -------
-    >>> parse_clue("1 2 3")
-    (1, 2, 3)
-    >>> parse_clue("")
-    (0,)
-    >>> parse_clue("  2   1  ")
-    (2, 1)
-    """
-    parts = text.strip().split()
-    if not parts:
-        return (0,)
-    try:
-        nums = tuple(int(p) for p in parts)
-    except ValueError:
-        return (0,)
-    return nums if any(n > 0 for n in nums) else (0,)
 
 
 # Boolean SAT encoding

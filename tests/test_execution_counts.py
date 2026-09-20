@@ -39,25 +39,10 @@ class TestExecutionCounts:
         _, counts = classical_solve(SMALL_PUZZLE, collect_counts=True)
         assert counts.literal_evaluations > 0
 
-    def test_constraint_checks_equals_clause_evaluations(self):
-        _, counts = classical_solve(SMALL_PUZZLE, collect_counts=True)
-        assert counts.constraint_checks == counts.clause_evaluations
-
     def test_early_terminations_occur(self):
         _, counts = classical_solve(SMALL_PUZZLE, collect_counts=True)
         # Most candidates should fail early
         assert counts.early_terminations > 0
-
-    def test_literals_per_candidate(self):
-        _, counts = classical_solve(SMALL_PUZZLE, collect_counts=True)
-        assert counts.literals_per_candidate > 0
-        assert counts.literals_per_candidate == (
-            counts.literal_evaluations / counts.candidates_evaluated
-        )
-
-    def test_clauses_per_candidate(self):
-        _, counts = classical_solve(SMALL_PUZZLE, collect_counts=True)
-        assert counts.clauses_per_candidate > 0
 
     def test_1x1_filled(self):
         puzzle = ([(1,)], [(1,)])

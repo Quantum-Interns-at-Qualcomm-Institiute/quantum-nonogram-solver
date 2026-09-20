@@ -1,6 +1,6 @@
 # Quantum Nonogram Solver
 
-Solves [nonogram](https://en.wikipedia.org/wiki/Nonogram) (Picross) puzzles two ways — by brute-force SAT search and by Grover's algorithm in Qiskit — and reports solve time, circuit depth and gate counts for both. Grover circuits run on the local statevector simulator or on IBM hardware through Qiskit Runtime. The repo holds a Python library, a Flask web UI and demo notebooks.
+Solves [nonogram](https://en.wikipedia.org/wiki/Nonogram) (Picross) puzzles two ways — by brute-force SAT search and by Grover's algorithm in Qiskit — and reports solve time, circuit depth and gate counts for both. Grover circuits run on the local statevector simulator or on IBM hardware through Qiskit Runtime. The repo holds a Python library and a JSON API over Flask and Socket.IO. The browser UI that calls this API lives in the website repo.
 
 ```
 Example: 4×6 puzzle              Solution:
@@ -28,8 +28,8 @@ Noiseless peak probability after k iterations is P(k) = sin²((2k+1)·arcsin(1/�
 
 | Grid | k=1 | k=3 | k=5 |
 |------|-----|-----|-----|
-| 2×2 (n=4) | 47.3% | 96.1% | 47.3% |
-| 3×3 (n=9) | 1.8% | 9.3% | 22.6% |
+| 2×2 (n=4) | 47.3% | 96.1% | 12.5% |
+| 3×3 (n=9) | 1.7% | 9.3% | 21.8% |
 
 ## Setup
 
@@ -44,9 +44,43 @@ conda env create --prefix .conda --file environment.yml
 pip install -e .
 ```
 
-`python tools/webapp.py` starts the web UI at `http://localhost:5055` and opens a browser. `make app` does the same. `make lab` starts JupyterLab with the demo notebook, and `make test` runs the suite.
+`python tools/webapp.py` starts the API on `http://localhost:8080`; set `PORT` to move it. `make app` does the same, `make test` runs the suite and `make bench` runs the size-by-size comparison.
 
-The UI has a grid editor, a probability histogram of the Grover outcomes, and a benchmark bar that runs both solvers over a chosen number of trials. Grover simulation is exponential in qubit count, so keep interactive grids at 3×3 or smaller. The server keeps its state in a module (`tools/state.py`) and is meant for one local user; do not expose it to a network.
+## The API
+
+`GET /api` lists every endpoint and every Socket.IO event, so the surface is discoverable with curl alone:
+
+```bash
+export SECRET=dev-secret
+ORIGIN_SECRET=$SECRET PORT=8080 python tools/webapp.py &
+curl -s localhost:8080/health
+curl -s -H "X-Origin-Secret: $SECRET" localhost:8080/api | python -m json.tool
+
+curl -s -X POST localhost:8080/api/solve/classical/sync \
+  -H "X-Origin-Secret: $SECRET" -H 'Content-Type: application/json' \
+  -d '{"row_clues": [[2],[2]], "col_clues": [[2],[2]]}'
+```
+
+Every solve has an asynchronous form that answers `{"ok": true}` and delivers the result over Socket.IO (`cl_done`, `qu_done`, `bench_done`), and a `/sync` form that returns it in the HTTP response. Errors share one envelope: `{"error": {"code": "<slug>", "message": "<human>"}}`.
+
+A quantum result carries the raw `counts` and an `outcomes` list — the same distribution ranked by probability, with each bitstring already reversed into row-major order, which is what a histogram is drawn from:
+
+```json
+{"outcomes": [{"bitstring": "1001", "grid": "1001", "count": 500, "probability": 0.49}]}
+```
+
+Add `"chart": true` to a quantum request and the response also carries `chart_img`, a base64 PNG of that distribution, for callers that would rather not draw it.
+
+Two things guard the service. Every route but `/health` needs the gateway's `X-Origin-Secret`, and with `ORIGIN_SECRET` unset the API refuses to serve at all unless you pass `NONOGRAM_ALLOW_INSECURE=1` for local work. Solves are capped at 20 grid cells, because both solvers are exponential in area, and one solve runs at a time — a second request gets a 409 while the first is running.
+
+## Deployment
+
+The `Dockerfile` runs gunicorn with a single threaded worker, since server state is per-process, and `railway.json` points Railway's health check at `/health`. TLS is the platform edge's job. Set `ORIGIN_SECRET` and, for hardware runs, `IBM_QUANTUM_TOKEN` as deployment secrets.
+
+```bash
+docker build -t nonogram .
+docker run -p 8080:8080 -e ORIGIN_SECRET=dev-secret nonogram
+```
 
 ## Solving from Python
 
@@ -64,7 +98,7 @@ for bs in classical_solve(puzzle):
 result = quantum_solve(puzzle)
 ```
 
-`nonogram/solver.py` holds the three solvers; `ClassicalSolver().solve(puzzle)` returns `{"solutions": [...]}` and `QuantumSimulatorSolver().solve(puzzle)` returns `{"counts": {...}, "iterations": ...}`. `ValidationError` is also a `ValueError` and `PuzzleIOError` is also an `OSError`, so ordinary `except` clauses still catch them.
+`nonogram/solver.py` holds the three solvers; `ClassicalSolver().solve(puzzle)` returns `{"solutions": [...]}` and `QuantumSimulatorSolver().solve(puzzle)` returns `{"counts": {...}}`. `ValidationError` is also a `ValueError` and `PuzzleIOError` is also an `OSError`, so ordinary `except` clauses still catch them.
 
 ## How it works
 
@@ -83,7 +117,7 @@ The classical solver walks all 2^(n·d) candidates and evaluates the clause list
 
 ## Running on IBM hardware
 
-Install `qiskit-ibm-runtime` and put your IBM Quantum API token in a `.env` file as `KEY=...`. In the web UI, **☁ IBM Hardware** in the benchmark bar connects, lists backends and submits jobs. From Python:
+Install `qiskit-ibm-runtime` and set `IBM_QUANTUM_TOKEN` in the environment, or put `IBM_QUANTUM_TOKEN=...` in a `.env` file at the repo root. The server holds the token: `/api/hw/backends` and `/api/hw/config` never accept one from a caller, so nobody else can spend the account's credits. With no token configured those routes answer 503 and the solver stays on the local simulator. From Python:
 
 ```python
 from nonogram.quantum import quantum_solve_hardware, list_backends
@@ -116,7 +150,24 @@ report = benchmark(([(2,), (2,)], [(2,), (2,)]), run_classical=True, run_quantum
 print_report(report)
 ```
 
-The report carries both solve times, the theoretical and measured speedup, qubit count, circuit depth, gate counts, peak memory and whether the solution checks out.
+`benchmark()` runs both solvers on one puzzle and captures:
+
+| Metric | Classical | Quantum |
+|---|---|---|
+| Wall-clock solve time | ✓ | ✓ |
+| Peak memory | ✓ | ✓ |
+| Solutions found | ✓ | ✓ |
+| Configurations evaluated | 2^(n·d) | — |
+| Throughput (configs/s) | ✓ | — |
+| Clause, subclause and literal evaluations | ✓ | — |
+| Qubits, circuit depth, gate counts | — | ✓ |
+| Grover iterations | — | ✓ |
+| Top-state measurement probability | — | ✓ |
+| Theoretical Grover speedup √N | derived | derived |
+| Actual speedup (time ratio) | derived | derived |
+| Oracle call reduction | derived | derived |
+
+`print_report(report)` prints all of it; `tools/chart.report_to_dict(report)` is the same data as JSON, which is what the API returns. The classical side is exponential in grid area, so benchmark small: a 2×3 answers instantly, the 4×6 demo puzzle takes about 18 minutes.
 
 ## Puzzle files
 
@@ -132,24 +183,24 @@ The report carries both solve times, the theoretical and measured speedup, qubit
 }
 ```
 
-`save_puzzle`, `load_puzzle`, `save_batch` and `load_batch` read and write these; the batch pair works on a whole directory.
+`save_puzzle` and `load_puzzle` read and write these.
 
 ## Testing
 
 ```bash
-make test                                     # full suite
-pytest tests/ -v -m "not slow"                # skip the slow classical tests
-pytest tests/test_hardware_2x2.py -v -s       # needs .env; costs one circuit
+make test                                     # everything that runs offline
+make test-hardware                            # the IBM tests; spends credits
+pytest tests/test_hardware_2x2.py -v -s -m hardware   # one circuit
 ```
 
-Three test files reach IBM: `test_hardware_parsing.py` (one REST call), `test_hardware_2x2.py` and `test_hardware_3x3.py` (one circuit each). Everything else runs offline.
+Three tests reach IBM: `test_list_backends_auth` (one REST call), `test_hardware_2x2.py` and `test_hardware_3x3.py` (one circuit each). They carry the `hardware` marker and `pytest.ini` deselects it, so a token in your environment is not on its own enough to spend credits. Everything else runs offline.
 
 ## Limitations
 
 - The `possible_d` lookup table in `data.py` covers line lengths 1–10, so puzzles top out at 10×10.
 - Simulating Grover is exponential. Puzzles above roughly 3×3 take minutes to hours locally.
 - Boolean synthesis produces circuits too deep for current hardware above 2×2, so there is no speedup to show on a real machine.
-- Qiskit returns little-endian bitstrings. The UI reverses them; callers of the Python API have to do it themselves.
+- Qiskit returns little-endian bitstrings. Reverse each key (`bs[::-1]`) to read it as a row-major grid.
 
 ## License
 

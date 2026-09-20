@@ -1,9 +1,4 @@
-"""Tests for nonogram.metrics.
-
-The quantum solver requires qiskit + tweedledum, so quantum-path tests are
-guarded with a skipif marker.  All structural / math tests run without any
-quantum dependencies.
-"""
+"""Tests for nonogram.metrics: the dataclasses, the benchmark runner and the report."""
 
 import io
 import math
@@ -22,7 +17,6 @@ from nonogram.metrics import (
 # Helpers / shared fixtures
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2×2, 4 variables
-SMALL_SOLUTION = "1001"
 
 
 def _make_classical() -> ClassicalMetrics:
@@ -118,41 +112,32 @@ class TestComparisonReport:
 
 
 class TestBenchmarkClassicalOnly:
-    def test_returns_comparison_report(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert isinstance(result, ComparisonReport)
+    """static_analysis is off here: it builds a Grover circuit these tests never read."""
 
-    def test_classical_metrics_populated(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.classical is not None
-        assert isinstance(result.classical, ClassicalMetrics)
+    @pytest.fixture(scope="class")
+    def report(self):
+        return benchmark(
+            SMALL_PUZZLE, run_classical=True, run_quantum=False, static_analysis=False
+        )
 
-    def test_quantum_metrics_absent(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.quantum is None
+    def test_reports_the_classical_side_only(self, report):
+        assert isinstance(report, ComparisonReport)
+        assert isinstance(report.classical, ClassicalMetrics)
+        assert report.quantum is None
 
-    def test_search_space_correct(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.search_space_size == 2**4  # 2×2 puzzle
+    def test_counts_the_whole_search_space(self, report):
+        assert report.search_space_size == 2**4
+        assert report.classical.configurations_evaluated == 16
+        assert report.classical.solutions_found == 2  # 1001 and 0110
 
-    def test_solutions_found(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.classical.solutions_found == 2  # 1001 and 0110
-
-    def test_configurations_evaluated(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.classical.configurations_evaluated == 16
-
-    def test_solve_time_positive(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.classical.solve_time_s > 0
-
-    def test_peak_memory_positive(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=True, run_quantum=False)
-        assert result.classical.peak_memory_kb > 0
+    def test_measures_time_and_memory(self, report):
+        assert report.classical.solve_time_s > 0
+        assert report.classical.peak_memory_kb > 0
 
     def test_neither_solver_runs(self):
-        result = benchmark(SMALL_PUZZLE, run_classical=False, run_quantum=False)
+        result = benchmark(
+            SMALL_PUZZLE, run_classical=False, run_quantum=False, static_analysis=False
+        )
         assert result.classical is None
         assert result.quantum is None
 

@@ -1,47 +1,35 @@
 """Tests for static quantum circuit analysis."""
 
+import pytest
 
 from nonogram.metrics import StaticCircuitAnalysis, analyze_circuit
 
 SMALL_PUZZLE = ([(1,), (1,)], [(1,), (1,)])  # 2x2
 
 
+@pytest.fixture(scope="module")
+def analysis():
+    """One circuit build for the whole module; analyze_circuit is deterministic."""
+    return analyze_circuit(SMALL_PUZZLE)
+
+
 class TestStaticCircuitAnalysis:
-    def test_returns_analysis(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert isinstance(result, StaticCircuitAnalysis)
+    def test_reports_a_consistent_circuit(self, analysis):
+        assert isinstance(analysis, StaticCircuitAnalysis)
+        assert analysis.num_qubits >= 4  # four problem qubits for a 2x2, plus ancilla
+        assert analysis.circuit_depth > 0
+        assert analysis.total_gate_count == sum(analysis.gate_counts_by_type.values())
+        assert analysis.grover_iterations >= 1
 
-    def test_num_qubits_positive(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert result.num_qubits > 0
-
-    def test_circuit_depth_positive(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert result.circuit_depth > 0
-
-    def test_total_gate_count_positive(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert result.total_gate_count > 0
-
-    def test_gate_counts_by_type_populated(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert len(result.gate_counts_by_type) > 0
-
-    def test_two_qubit_gate_density_range(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert 0.0 <= result.two_qubit_gate_density <= 1.0
-
-    def test_depth_per_iteration_positive(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert result.depth_per_iteration > 0
-
-    def test_gates_per_qubit_positive(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert result.gates_per_qubit > 0
-
-    def test_grover_iterations_positive(self):
-        result = analyze_circuit(SMALL_PUZZLE)
-        assert result.grover_iterations >= 1
+    def test_derived_ratios_follow_the_counts(self, analysis):
+        assert analysis.two_qubit_gate_density == (
+            analysis.two_qubit_gate_count / analysis.total_gate_count
+        )
+        assert analysis.depth_per_iteration == (
+            analysis.circuit_depth / analysis.grover_iterations
+        )
+        assert analysis.gates_per_qubit == analysis.total_gate_count / analysis.num_qubits
+        assert analysis.ancilla_qubits == analysis.num_qubits - analysis.problem_qubits
 
     def test_3x3_has_more_qubits_than_2x2(self):
         small = analyze_circuit(SMALL_PUZZLE)

@@ -63,6 +63,112 @@ class TestSolveRouteBadBody:
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == "invalid_puzzle"
 
+    @pytest.mark.parametrize(
+        "document",
+        [
+            [1, 2],
+            {"row_clues": 5, "col_clues": [[1]]},
+            {"row_clues": [[-5]], "col_clues": [[1]]},
+            {"row_clues": [[1]] * 40, "col_clues": [[1]] * 40},
+        ],
+        ids=["list", "scalar", "negative", "oversized"],
+    )
+    def test_upload_is_validated_before_it_reaches_state(self, client, document):
+        """An upload past the size cap used to set rows/cols beyond MAX_GRID."""
+        import io as _io
+
+        from tools.state import state
+
+        buf = _io.BytesIO(json.dumps(document).encode())
+        resp = client.post(
+            "/api/puzzle/load",
+            data={"file": (buf, "p.non.json")},
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "invalid_puzzle"
+        assert state["rows"] <= 10
+        assert state["cols"] <= 10
+
+
+class TestMalformedFieldsAre400:
+    """A field the caller got wrong is a 400, never a 500.
+
+    Every route below used to coerce or index a request field before checking its
+    type, so `{"rows": "abc"}` surfaced as an internal error.
+    """
+
+    @pytest.fixture
+    def client(self):
+        from tools.webapp import app
+
+        return app.test_client()
+
+    @pytest.mark.parametrize(
+        "path,body,code",
+        [
+            ("/api/grid", {"rows": "abc", "cols": 3}, "invalid_dimensions"),
+            ("/api/grid", {"rows": None, "cols": None}, "invalid_dimensions"),
+            ("/api/grid", {"rows": [1], "cols": 2}, "invalid_dimensions"),
+            ("/api/grid", [1, 2], "invalid_dimensions"),
+            ("/api/randomize", {"rows": "x", "cols": 2}, "invalid_dimensions"),
+        ],
+    )
+    def test_grid_routes(self, client, path, body, code):
+        resp = client.post(path, json=body)
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == code
+
+    def test_hardware_shots(self, client, monkeypatch):
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
+        resp = client.post("/api/hw/config", json={"backend_name": "b", "shots": "lots"})
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "invalid_shots"
+
+    def test_puzzle_save_non_string_name(self, client):
+        resp = client.post(
+            "/api/puzzle/save", json={"row_clues": [[1]], "col_clues": [[1]], "name": 5}
+        )
+        assert resp.status_code == 200
+
+    @pytest.mark.parametrize(
+        "path",
+        ["/api/solve/classical/sync", "/api/solve/quantum/sync", "/api/benchmark/sync"],
+    )
+    def test_sync_routes_match_the_async_ones(self, client, path):
+        # The async routes 400 on this body; the sync ones used to 500 on it.
+        resp = client.post(path, json={"nonsense": True})
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "invalid_clues"
+
+
+class TestBadTrialsDoesNotWedgeTheSolver:
+    """A bad trial count is parsed before the busy lock, so it cannot strand it.
+
+    Parsed after the lock, one such request left `busy` True for the life of the
+    process and every later solve answered 409.
+    """
+
+    @pytest.fixture
+    def client(self):
+        from tools.webapp import app
+
+        return app.test_client()
+
+    @pytest.mark.parametrize("trials", ["x", None, [1]])
+    def test_bad_trials_is_400_and_leaves_the_lock_free(self, client, trials):
+        from tools.state import state
+
+        body = {"row_clues": [[1], [1]], "col_clues": [[1], [1]], "trials": trials}
+        resp = client.post("/api/benchmark", json=body)
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "invalid_trials"
+        assert state["busy"] is False
+
+        # The solver is still reachable.
+        assert client.post("/api/benchmark/sync", json={**body, "trials": 1}).status_code == 200
+        assert state["busy"] is False
+
 
 class TestRunArtifactCap:
     """_save_run prunes oldest files so the store stays bounded."""
@@ -111,3 +217,37 @@ class TestSanitizedErrors:
 
     def test_truncated(self):
         assert len(_sanitize_error(Exception("x" * 10_000))) <= 500
+
+
+class TestMaxCluesIsEnforced:
+    """/api/config advertises a block limit per clue; the solve routes hold it."""
+
+    @pytest.fixture
+    def client(self):
+        from tools.webapp import app
+
+        return app.test_client()
+
+    def test_config_reports_the_limit(self, client):
+        from tools.config import MAX_CLUES
+
+        assert client.get("/api/config").get_json()["max_clues"] == MAX_CLUES
+
+    @pytest.mark.parametrize(
+        "path", ["/api/solve/classical", "/api/solve/quantum", "/api/benchmark"]
+    )
+    def test_too_many_blocks_is_400(self, client, path):
+        from tools.config import MAX_CLUES
+
+        clue = [1] * (MAX_CLUES + 1)
+        body = {"row_clues": [clue], "col_clues": [[1]] * (2 * len(clue) - 1)}
+        resp = client.post(path, json=body)
+        assert resp.status_code == 400
+        assert "block" in resp.get_json()["error"]["message"]
+
+    def test_the_limit_itself_is_accepted(self, client):
+        from tools.config import MAX_CLUES
+
+        clue = [1] * MAX_CLUES
+        body = {"row_clues": [clue], "col_clues": [[1]] * (2 * len(clue) - 1)}
+        assert client.post("/api/solve/classical/sync", json=body).status_code == 200

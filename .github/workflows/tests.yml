@@ -29,8 +29,10 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # No -m here: a command-line -m replaces the deselection in pytest.ini
+      # rather than adding to it, which would put the IBM tests back in CI.
       - name: Run tests
-        run: pytest tests/ -v --tb=short -m "not slow"
+        run: pytest tests/ -v --tb=short
 
   contract:
     runs-on: ubuntu-latest
@@ -43,9 +45,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
-          pip install jsonschema
+        run: pip install -e ".[dev]"
 
       - name: Boot nonogram and run the live-HTTP contract tests
         run: |

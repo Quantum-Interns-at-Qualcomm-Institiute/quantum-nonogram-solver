@@ -13,8 +13,9 @@ import os
 
 from flask import Blueprint, jsonify, request
 
+from nonogram.errors import ValidationError
 from tools import state as _state_mod
-from tools.errors import respond_error
+from tools.errors import json_object, require_int, respond_error
 from tools.state import emit_status, state, state_lock
 
 bp = Blueprint("hardware", __name__)
@@ -33,8 +34,13 @@ def _ibm_token() -> str | None:
 
 
 def _ibm_channel(data: dict) -> str:
-    """The Runtime channel (not a secret): env override, else caller, else default."""
-    return os.environ.get("IBM_QUANTUM_CHANNEL") or data.get("channel") or "ibm_quantum"
+    """The Runtime channel (not a secret): env override, else caller, else default.
+
+    ``ibm_quantum_platform`` is the channel qiskit-ibm-runtime 0.30 and later expect.
+    """
+    return (
+        os.environ.get("IBM_QUANTUM_CHANNEL") or data.get("channel") or "ibm_quantum_platform"
+    )
 
 
 @bp.route("/api/hw/backends", methods=["POST"])
@@ -45,7 +51,10 @@ def api_hw_backends():
         return respond_error(
             "hardware_unconfigured", "IBM hardware is not configured on this server", 503
         )
-    data = request.json or {}
+    try:
+        data = json_object(request.json or {})
+    except ValidationError as exc:
+        return respond_error("invalid_json", str(exc), 400)
     try:
         from nonogram.quantum import list_backends
 
@@ -64,7 +73,10 @@ def api_hw_backends():
 @bp.route("/api/hw/config", methods=["POST"])
 def api_hw_config():
     """Enable or disable hardware mode. Credentials come from the server, not the body."""
-    data = request.json or {}
+    try:
+        data = json_object(request.json or {})
+    except ValidationError as exc:
+        return respond_error("invalid_json", str(exc), 400)
     if not data or data.get("disconnect"):
         with state_lock:
             state["hw_config"] = None
@@ -77,11 +89,15 @@ def api_hw_config():
         return respond_error(
             "hardware_unconfigured", "IBM hardware is not configured on this server", 503
         )
+    try:
+        shots = require_int(data, "shots", 1024)
+    except ValidationError as exc:
+        return respond_error("invalid_shots", str(exc), 400)
     cfg = {
         "token": token,  # server-held; a caller can never set or read this
         "channel": _ibm_channel(data),
         "backend_name": data.get("backend_name"),
-        "shots": min(MAX_SHOTS, max(1, int(data.get("shots", 1024)))),
+        "shots": min(MAX_SHOTS, max(1, shots)),
     }
     with state_lock:
         state["hw_config"] = cfg

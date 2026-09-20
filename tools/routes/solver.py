@@ -15,18 +15,23 @@ from __future__ import annotations
 
 import json
 import os
-import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
-from tools.chart import render_chart_b64, report_to_dict
-from tools.config import MAX_TRIALS, RUNS_DIR
-from tools.errors import respond_error
+from nonogram.errors import ValidationError
+from tools.chart import measurement_rows, render_chart_b64, render_histogram_b64, report_to_dict
+from tools.config import MAX_CLUES, MAX_TRIALS, RUNS_DIR
+from tools.errors import json_object, require_int, respond_error
 from tools.state import emit_status, set_busy, state, state_lock
 
 bp = Blueprint("solver", __name__)
+
+# Qiskit's native circuit building segfaults when a second short-lived thread picks
+# it up after the first has exited, so every solve runs on this one worker.
+_SOLVER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="nonogram-solver")
 
 
 def _sanitize_error(exc: Exception) -> str:
@@ -72,7 +77,6 @@ def _build_payload(
     hardware=None,
     row_clues=None,
     col_clues=None,
-    qu_counts_per_trial=None,
 ) -> dict:
     """Build the common payload dict for bench_done events and run persistence."""
     return {
@@ -81,7 +85,7 @@ def _build_payload(
         "report": report_to_dict(report),
         "solutions": solutions,
         "qu_counts": qu_counts,
-        "qu_counts_per_trial": qu_counts_per_trial,
+        "qu_outcomes": measurement_rows(qu_counts) if qu_counts else [],
         "rows": rows,
         "cols": cols,
         "trials": trials,
@@ -172,11 +176,14 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
 
         from nonogram.quantum import quantum_solve_hardware
 
-        cl_times: list[float] = []
-        for _ in range(trials):
-            rpt = benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
-            if rpt.classical:
-                cl_times.append(rpt.classical.solve_time_s)
+        # Keep the last trial's report: re-running the benchmark for one would be
+        # another full exhaustive solve.
+        reports = [
+            benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
+            for _ in range(trials)
+        ]
+        cl_times: list[float] = [r.classical.solve_time_s for r in reports if r.classical]
+        report = reports[-1]
         t0 = time.perf_counter()
         hw_counts, backend_name = quantum_solve_hardware(
             (row_clues, col_clues),
@@ -186,7 +193,6 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
             shots=hw_cfg["shots"],
         )
         qu_times = [time.perf_counter() - t0]
-        report = benchmark((row_clues, col_clues), run_classical=True, run_quantum=False)
         solutions = classical_solve((row_clues, col_clues))
         chart_b64 = render_chart_b64(report, cl_times, qu_times)
         payload = _build_payload(
@@ -234,13 +240,35 @@ def _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg) -> dict:
             chart_b64,
             row_clues=row_clues,
             col_clues=col_clues,
-            qu_counts_per_trial=None,
         )
     _save_run(payload)
     return payload
 
 
 # Shared request preamble for the synchronous routes
+
+
+def _quantum_payload(counts: dict, rows: int, cols: int, data: dict) -> dict:
+    """The quantum result the clients read: counts, ranked rows, and a chart on request.
+
+    ``outcomes`` is the distribution already ranked and reversed into row-major
+    order, so a caller charts it without re-deriving anything. ``{"chart": true}``
+    adds a rendered PNG for callers that would rather not draw it themselves.
+    """
+    payload = {
+        "counts": counts,
+        "rows": rows,
+        "cols": cols,
+        "outcomes": measurement_rows(counts),
+    }
+    if data.get("chart"):
+        payload["chart_img"] = render_histogram_b64(counts)
+    return payload
+
+
+def _trials(data: dict) -> int:
+    """The requested trial count, clamped to MAX_TRIALS."""
+    return min(MAX_TRIALS, max(1, require_int(data, "trials", 1)))
 
 
 def _acquire_or_busy():
@@ -253,23 +281,24 @@ def _acquire_or_busy():
 
 
 def _parse_validated_clues():
-    """Parse + validate clues from the request body.
+    """Parse + validate clues from the request body, including the grid-area cap.
 
     Returns ``(row_clues, col_clues, rows, cols, None)`` on success, or
-    ``(None, None, None, None, error_response)`` on a bad body.
+    ``(None, None, None, None, error_response)`` on a bad body. ``ValidationError``
+    is a ``ValueError``, so one clause covers both the shape check and the caps.
     """
     data = request.json
     if data is None:
         return None, None, None, None, respond_error(
             "invalid_json", "Invalid or missing JSON body", 400
         )
-    row_clues, col_clues, rows, cols = _parse_clues(data)
     from nonogram.io import _MAX_CELLS, _validate_clues
 
     try:
-        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS)
-    except Exception as e:
-        return None, None, None, None, respond_error("invalid_clues", str(e), 400)
+        row_clues, col_clues, rows, cols = _parse_clues(json_object(data))
+        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS, max_blocks=MAX_CLUES)
+    except ValueError as exc:
+        return None, None, None, None, respond_error("invalid_clues", str(exc), 400)
     return row_clues, col_clues, rows, cols, None
 
 
@@ -278,27 +307,16 @@ def api_solve_classical():
     """Trigger a classical (brute-force) solve in a background thread."""
     # Parse and validate, including the grid-area cap, before taking the busy
     # lock, so a bad or oversized body (400/413) leaves the solver free.
-    data = request.json
-    if data is None:
-        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
-    try:
-        row_clues, col_clues, rows, cols = _parse_clues(data)
-    except ValueError as e:
-        return respond_error("invalid_clues", str(e), 400)
+    row_clues, col_clues, rows, cols, err = _parse_validated_clues()
+    if err is not None:
+        return err
 
-    from nonogram.io import _MAX_CELLS, _validate_clues
-    try:
-        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS)
-    except Exception as e:
-        return respond_error("invalid_clues", str(e), 400)
-
-    with state_lock:
-        if state["busy"]:
-            return respond_error("solver_busy", "Solver busy", 409)
-        state["busy"] = True
+    busy = _acquire_or_busy()
+    if busy is not None:
+        return busy
 
     # Scope result emits to the requesting client when it tells us its sid.
-    to = data.get("sid") or None
+    to = request.json.get("sid") or None
 
     from nonogram.solver import ClassicalSolver
 
@@ -321,7 +339,7 @@ def api_solve_classical():
         finally:
             set_busy(False)
 
-    threading.Thread(target=_work, daemon=True).start()
+    _SOLVER.submit(_work)
     return jsonify({"ok": True})
 
 
@@ -330,24 +348,14 @@ def api_solve_quantum():
     """Trigger a quantum (Grover) solve in a background thread."""
     # Parse and validate, including the grid-area cap, before taking the busy
     # lock, so a bad or oversized body (400/413) leaves the solver free.
+    row_clues, col_clues, rows, cols, err = _parse_validated_clues()
+    if err is not None:
+        return err
     data = request.json
-    if data is None:
-        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
-    try:
-        row_clues, col_clues, rows, cols = _parse_clues(data)
-    except ValueError as e:
-        return respond_error("invalid_clues", str(e), 400)
 
-    from nonogram.io import _MAX_CELLS, _validate_clues
-    try:
-        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS)
-    except Exception as e:
-        return respond_error("invalid_clues", str(e), 400)
-
-    with state_lock:
-        if state["busy"]:
-            return respond_error("solver_busy", "Solver busy", 409)
-        state["busy"] = True
+    busy = _acquire_or_busy()
+    if busy is not None:
+        return busy
 
     to = data.get("sid") or None
     solver = _get_quantum_solver(_request_hw_cfg(data))
@@ -359,7 +367,7 @@ def api_solve_quantum():
 
             result = solver.solve((row_clues, col_clues))
             counts = result["counts"]
-            socketio.emit("qu_done", {"counts": counts, "rows": rows, "cols": cols}, to=to)
+            socketio.emit("qu_done", _quantum_payload(counts, rows, cols, data), to=to)
             if "backend_name" in result:
                 emit_status(f"{solver.name} complete.", "ok", to=to)
             else:
@@ -379,34 +387,26 @@ def api_solve_quantum():
         finally:
             set_busy(False)
 
-    threading.Thread(target=_work, daemon=True).start()
+    _SOLVER.submit(_work)
     return jsonify({"ok": True})
 
 
 @bp.route("/api/benchmark", methods=["POST"])
 def api_benchmark():
     """Run a benchmark comparing classical and quantum solvers."""
-    # Parse and validate, including the grid-area cap, before taking the busy
-    # lock, so a bad or oversized body (400/413) leaves the solver free.
+    # Every field parses before the busy lock: one parsed after it strands the lock.
+    row_clues, col_clues, rows, cols, err = _parse_validated_clues()
+    if err is not None:
+        return err
     data = request.json
-    if data is None:
-        return respond_error("invalid_json", "Invalid or missing JSON body", 400)
     try:
-        row_clues, col_clues, rows, cols = _parse_clues(data)
-    except ValueError as e:
-        return respond_error("invalid_clues", str(e), 400)
+        trials = _trials(data)
+    except ValidationError as exc:
+        return respond_error("invalid_trials", str(exc), 400)
 
-    from nonogram.io import _MAX_CELLS, _validate_clues
-    try:
-        _validate_clues(row_clues, col_clues, max_cells=_MAX_CELLS)
-    except Exception as e:
-        return respond_error("invalid_clues", str(e), 400)
-
-    with state_lock:
-        if state["busy"]:
-            return respond_error("solver_busy", "Solver busy", 409)
-        state["busy"] = True
-    trials = min(MAX_TRIALS, max(1, int(data.get("trials", 1))))
+    busy = _acquire_or_busy()
+    if busy is not None:
+        return busy
     to = data.get("sid") or None
     hw_cfg = _request_hw_cfg(data)
     label = f"{trials} trial{'s' if trials > 1 else ''}"
@@ -432,7 +432,7 @@ def api_benchmark():
         finally:
             set_busy(False)
 
-    threading.Thread(target=_work, daemon=True).start()
+    _SOLVER.submit(_work)
     return jsonify({"ok": True})
 
 
@@ -470,7 +470,7 @@ def api_solve_quantum_sync():
         if err is not None:
             return err
         result = _get_quantum_solver().solve((row_clues, col_clues))
-        return jsonify({"counts": result["counts"], "rows": rows, "cols": cols})
+        return jsonify(_quantum_payload(result["counts"], rows, cols, request.json))
     except Exception as exc:
         return respond_error("solve_error", _sanitize_error(exc), 500)
     finally:
@@ -487,7 +487,10 @@ def api_benchmark_sync():
         row_clues, col_clues, rows, cols, err = _parse_validated_clues()
         if err is not None:
             return err
-        trials = min(MAX_TRIALS, max(1, int((request.json or {}).get("trials", 1))))
+        try:
+            trials = _trials(json_object(request.json or {}))
+        except ValidationError as exc:
+            return respond_error("invalid_trials", str(exc), 400)
         with state_lock:
             hw_cfg = state.get("hw_config")
         payload = _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg)

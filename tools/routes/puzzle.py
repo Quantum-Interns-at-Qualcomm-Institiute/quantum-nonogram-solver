@@ -31,7 +31,7 @@ def api_puzzle_load():
             # load_puzzle validates clue shape, values and the per-line size cap
             # before the grid below is allocated, so a bad upload is a 400.
             data = load_puzzle(tmp.name)
-        except (ValidationError, PuzzleIOError, ValueError, KeyError) as exc:
+        except (ValidationError, PuzzleIOError, ValueError) as exc:
             return respond_error("invalid_puzzle", str(exc)[:500], 400)
         finally:
             Path(tmp.name).unlink()
@@ -41,7 +41,6 @@ def api_puzzle_load():
         state["puzzle_name"] = data.get("name", "puzzle") or "puzzle"
         state["rows"] = len(row_clues)
         state["cols"] = len(col_clues)
-        state["grid"] = [[False] * len(col_clues) for _ in range(len(row_clues))]
     return jsonify(
         {
             "name": state["puzzle_name"],
@@ -75,7 +74,7 @@ def api_puzzle_save():
         return respond_error("invalid_clues", str(exc)[:500], 400)
     # The display name stays as given (bounded); only the filename is slugified,
     # since it lands in a Content-Disposition header.
-    name = (data.get("name", state["puzzle_name"]) or "puzzle")[:100]
+    name = str(data.get("name", state["puzzle_name"]) or "puzzle")[:100]
     safe_name = _slugify(name)
     buf = io.BytesIO()
     payload = {
