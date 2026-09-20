@@ -41,6 +41,55 @@ class TestOriginGuard:
         assert res.status_code == 200
 
 
+class TestRotation:
+    """ORIGIN_SECRET is a set, so the gateway can move to a new value in its own
+    deploy: add the new secret, switch the sender, then drop the old one."""
+
+    @pytest.fixture()
+    def rotating_client(self, monkeypatch):
+        monkeypatch.setenv("ORIGIN_SECRET", "new-door, front-door")
+        monkeypatch.delenv("NONOGRAM_ALLOW_INSECURE", raising=False)
+        from tools.webapp import app
+
+        app.config["TESTING"] = True
+        return app.test_client()
+
+    def test_both_secrets_admitted_mid_rotation(self, rotating_client):
+        for secret in ("front-door", "new-door"):
+            res = rotating_client.get("/api/config", headers={"X-Origin-Secret": secret})
+            assert res.status_code == 200, secret
+
+    def test_other_secrets_still_rejected(self, rotating_client):
+        res = rotating_client.get("/api/config", headers={"X-Origin-Secret": "nope"})
+        assert res.status_code == 403
+
+    def test_the_whole_list_is_not_a_secret(self, rotating_client):
+        # A sender that forwards the raw setting instead of one entry must not pass.
+        res = rotating_client.get(
+            "/api/config", headers={"X-Origin-Secret": "new-door, front-door"}
+        )
+        assert res.status_code == 403
+
+    def test_retired_secret_rejected_once_dropped(self, monkeypatch):
+        monkeypatch.setenv("ORIGIN_SECRET", "new-door")
+        monkeypatch.delenv("NONOGRAM_ALLOW_INSECURE", raising=False)
+        from tools.webapp import app
+
+        app.config["TESTING"] = True
+        res = app.test_client().get("/api/config", headers={"X-Origin-Secret": "front-door"})
+        assert res.status_code == 403
+
+    def test_blank_entries_do_not_open_the_door(self, monkeypatch):
+        # " , " parses to an empty set, which is "unconfigured", not "allow anything".
+        monkeypatch.setenv("ORIGIN_SECRET", " , ")
+        monkeypatch.delenv("NONOGRAM_ALLOW_INSECURE", raising=False)
+        from tools.webapp import app
+
+        app.config["TESTING"] = True
+        res = app.test_client().get("/api/config", headers={"X-Origin-Secret": ""})
+        assert res.status_code == 403
+
+
 class TestGuardFailsClosedWhenUnconfigured:
     def test_unset_secret_refuses_service(self, monkeypatch):
         monkeypatch.delenv("ORIGIN_SECRET", raising=False)
