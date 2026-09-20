@@ -16,6 +16,8 @@ import logging
 from flask import jsonify
 from werkzeug.exceptions import HTTPException
 
+from nonogram.errors import ValidationError
+
 _log = logging.getLogger(__name__)
 
 # Stable machine codes for framework-raised HTTP errors (404, 405, 500, ...).
@@ -45,6 +47,37 @@ def error_body(code: str, message: str, details=None) -> dict:
 def respond_error(code: str, message: str, status: int, details=None):
     """Return a Flask ``(response, status)`` tuple carrying the error envelope."""
     return jsonify(error_body(code, message, details)), status
+
+
+def json_object(data) -> dict:
+    """Return *data* when it is a JSON object, else raise ValidationError.
+
+    Routes read their fields with ``.get``, which raises AttributeError on a list or a
+    scalar body; that is a caller error, so it has to surface as one.
+    """
+    if not isinstance(data, dict):
+        raise ValidationError("request body must be a JSON object")
+    return data
+
+
+def require_int(data: dict, key: str, default, minimum=None, maximum=None) -> int:
+    """Return ``data[key]`` as an int, raising ValidationError when it is not one.
+
+    A missing key takes *default*. Bounds are inclusive. ``bool`` is rejected: it is an
+    int subclass, so ``True`` would otherwise silently mean 1.
+    """
+    raw = data.get(key, default)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        raise ValidationError(f"{key} must be an integer, got {type(raw).__name__}")
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValidationError(f"{key} must be an integer, got {raw!r}") from None
+    if minimum is not None and value < minimum:
+        raise ValidationError(f"{key} must be at least {minimum}, got {value}")
+    if maximum is not None and value > maximum:
+        raise ValidationError(f"{key} must be at most {maximum}, got {value}")
+    return value
 
 
 def register_error_handlers(app):

@@ -75,7 +75,7 @@ def api_puzzle_save():
         return respond_error("invalid_clues", str(exc)[:500], 400)
     # The display name stays as given (bounded); only the filename is slugified,
     # since it lands in a Content-Disposition header.
-    name = (data.get("name", state["puzzle_name"]) or "puzzle")[:100]
+    name = str(data.get("name", state["puzzle_name"]) or "puzzle")[:100]
     safe_name = _slugify(name)
     buf = io.BytesIO()
     payload = {
