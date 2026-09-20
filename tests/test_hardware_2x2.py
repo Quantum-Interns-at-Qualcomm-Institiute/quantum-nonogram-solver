@@ -39,6 +39,8 @@ Run:  pytest tests/test_hardware_2x2.py -v -s
 import pytest
 from conftest import load_ibm_token
 
+pytestmark = pytest.mark.hardware
+
 
 @pytest.mark.skipif(
     load_ibm_token() is None,

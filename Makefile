@@ -22,7 +22,7 @@ RUFF         = $(ENV_PREFIX)/bin/ruff
 KERNEL_NAME  = quantum-nonogram
 KERNEL_LABEL = Quantum Nonogram (Python 3.11)
 
-.PHONY: help env install kernel lab app test lint clean
+.PHONY: help env install kernel lab app test test-hardware lint clean
 
 # ── help ──────────────────────────────────────────────────────────────────────
 help:
@@ -32,7 +32,8 @@ help:
 	@echo "  make kernel   Register the Jupyter kernel (user-level, visible everywhere)"
 	@echo "  make lab      Launch JupyterLab"
 	@echo "  make app      Launch the web app (Flask)"
-	@echo "  make test     Run pytest"
+	@echo "  make test     Run pytest (hardware tests deselected)"
+	@echo "  make test-hardware  Run the IBM hardware tests (spends credits)"
 	@echo "  make lint     Run ruff over the whole repo"
 	@echo "  make clean    Remove __pycache__ and .pytest_cache"
 	@echo ""
@@ -76,8 +77,13 @@ app:
 	$(PYTHON) tools/webapp.py
 
 # ── test ──────────────────────────────────────────────────────────────────────
+# Hardware tests are deselected by pytest.ini; test-hardware asks for them and
+# spends real IBM Quantum credits.
 test:
 	$(PYTEST) tests/ -v
+
+test-hardware:
+	$(PYTEST) tests/ -v -s -m hardware
 
 # ── lint ──────────────────────────────────────────────────────────────────────
 lint:

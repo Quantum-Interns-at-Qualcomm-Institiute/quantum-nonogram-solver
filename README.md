@@ -137,12 +137,12 @@ The report carries both solve times, the theoretical and measured speedup, qubit
 ## Testing
 
 ```bash
-make test                                     # full suite
-pytest tests/ -v -m "not slow"                # skip the slow classical tests
-pytest tests/test_hardware_2x2.py -v -s       # needs .env; costs one circuit
+make test                                     # everything that runs offline
+make test-hardware                            # the IBM tests; spends credits
+pytest tests/test_hardware_2x2.py -v -s -m hardware   # one circuit
 ```
 
-Three test files reach IBM: `test_hardware_parsing.py` (one REST call), `test_hardware_2x2.py` and `test_hardware_3x3.py` (one circuit each). Everything else runs offline.
+Three tests reach IBM: `test_list_backends_auth` (one REST call), `test_hardware_2x2.py` and `test_hardware_3x3.py` (one circuit each). They carry the `hardware` marker and `pytest.ini` deselects it, so a token in your environment is not on its own enough to spend credits. Everything else runs offline.
 
 ## Limitations
 

@@ -92,6 +92,7 @@ def test_databin_parsing_logic():
 # Test 2: list_backends() auth (1 REST call, zero compute cost)
 
 
+@pytest.mark.hardware
 @pytest.mark.skipif(
     load_ibm_token() is None,
     reason="IBM_QUANTUM_TOKEN env var not set and .env not found",

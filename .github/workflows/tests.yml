@@ -29,8 +29,10 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # No -m here: a command-line -m replaces the deselection in pytest.ini
+      # rather than adding to it, which would put the IBM tests back in CI.
       - name: Run tests
-        run: pytest tests/ -v --tb=short -m "not slow"
+        run: pytest tests/ -v --tb=short
 
   contract:
     runs-on: ubuntu-latest
