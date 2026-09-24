@@ -93,6 +93,18 @@ socketio = SocketIO(
 )
 
 
+def _accepted_origin_secrets() -> list[str]:
+    """The secrets the front door may present, newest first.
+
+    ORIGIN_SECRET is a comma-separated set so the gateway can move to a new value
+    without an outage: add the new secret here, switch the gateway to it, then drop
+    the old one. A single value behaves as a plain equality check. Read per request
+    so a changed environment takes effect without a restart.
+    """
+    raw = os.environ.get("ORIGIN_SECRET") or ""
+    return [part for part in (piece.strip() for piece in raw.split(",")) if part]
+
+
 # Front-door guard (fail closed)
 # Every route but /health needs the gateway's X-Origin-Secret. With ORIGIN_SECRET
 # unset the API refuses to serve (unless NONOGRAM_ALLOW_INSECURE=1): the hardware
@@ -101,7 +113,7 @@ socketio = SocketIO(
 def _origin_guard():
     if request.path == "/health":
         return None
-    want = os.environ.get("ORIGIN_SECRET")
+    want = _accepted_origin_secrets()
     if not want:
         if os.environ.get("NONOGRAM_ALLOW_INSECURE") == "1":
             return None
@@ -114,8 +126,13 @@ def _origin_guard():
             }
         ), 403
     got = request.headers.get("X-Origin-Secret") or ""
-    # compare_digest: a plain != on a secret leaks timing.
-    if not hmac.compare_digest(got, want):
+    # compare_digest on every candidate: a plain != leaks timing, and stopping at the
+    # first match would leak which secret it was.
+    ok = False
+    for candidate in want:
+        if hmac.compare_digest(got, candidate):
+            ok = True
+    if not ok:
         return jsonify({"error": {"code": "forbidden", "message": "origin"}}), 403
     return None
 
