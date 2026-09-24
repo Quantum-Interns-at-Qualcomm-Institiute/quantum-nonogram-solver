@@ -27,7 +27,7 @@ help:
 	@echo "  make test     Run pytest (hardware tests deselected)"
 	@echo "  make test-hardware  Run the IBM hardware tests (spends credits)"
 	@echo "  make bench    Run the Grover vs brute-force comparison"
-	@echo "  make lock     Regenerate requirements.lock (needs Docker)"
+	@echo "  make lock     Regenerate the per-Python locks (needs Docker)"
 	@echo "  make lint     Run ruff over the whole repo"
 	@echo "  make clean    Remove __pycache__ and .pytest_cache"
 	@echo ""
@@ -67,11 +67,19 @@ bench:
 	$(PYTHON) tools/benchmark_comparison.py
 
 # ── lock ──────────────────────────────────────────────────────────────────────
-# Runs in the image the Dockerfile builds from, so the pins match that platform.
+# One lock per Python the project supports: a single file cannot serve them all,
+# since some pins have no distribution for the older versions. Each is resolved
+# inside that version's slim image, so the pins match the platform that uses them.
+PYTHONS = 3.10 3.11 3.12
+
 lock:
-	docker run --rm -v "$(CURDIR)":/src -w /src python:3.12-slim \
-	  sh -c 'pip install --quiet . && pip freeze --exclude-editable | grep -v "^nonogram" > requirements.lock'
-	@echo "✓ requirements.lock regenerated."
+	@mkdir -p requirements
+	@for v in $(PYTHONS); do \
+	  echo "→ resolving for Python $$v …"; \
+	  docker run --rm -v "$(CURDIR)":/src -w /src python:$$v-slim \
+	    sh -c "pip install --quiet . && pip freeze --exclude-editable | grep -v '^nonogram' > requirements/py$$v.lock" || exit 1; \
+	done
+	@echo "✓ locks regenerated for: $(PYTHONS)"
 
 # ── lint ──────────────────────────────────────────────────────────────────────
 lint:

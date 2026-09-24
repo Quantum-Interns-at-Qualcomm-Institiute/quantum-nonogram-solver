@@ -21,8 +21,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # -c pins every runtime dependency to the lock for this Python, so a release
+      # made today cannot change what CI tested yesterday. Dev tools resolve freely.
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -c requirements/py${{ matrix.python-version }}.lock -e ".[dev]"
 
       # Lint first — fast feedback, and it uses the ruff pinned by the [dev]
       # extra rather than a floating pip install.
@@ -45,7 +47,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -c requirements/py3.12.lock -e ".[dev]"
 
       - name: Boot nonogram and run the live-HTTP contract tests
         run: |
