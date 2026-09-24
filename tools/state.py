@@ -10,13 +10,20 @@ from flask_socketio import SocketIO
 # Server state (single-operator app). The posted grid is validated but not kept:
 # no route serves it back, and solves take their clues from the request body.
 _DEFAULT_SIZE = 4
-state: dict[str, Any] = {
-    "rows": _DEFAULT_SIZE,
-    "cols": _DEFAULT_SIZE,
-    "hw_config": None,
-    "busy": False,
-    "puzzle_name": "puzzle",
-}
+
+
+def default_state() -> dict[str, Any]:
+    """A fresh copy of the state a server starts with."""
+    return {
+        "rows": _DEFAULT_SIZE,
+        "cols": _DEFAULT_SIZE,
+        "hw_config": None,
+        "busy": False,
+        "puzzle_name": "puzzle",
+    }
+
+
+state: dict[str, Any] = default_state()
 state_lock = threading.Lock()
 
 # Set once the SocketIO server exists.
