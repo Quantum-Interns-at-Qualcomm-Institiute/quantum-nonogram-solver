@@ -14,7 +14,7 @@ Col clues:  (4),(1),(1),         ║■■□□■■║
 
 ## Results on hardware
 
-The 2×2 all-2s puzzle on `ibm_torino`, one Grover iteration, measured the correct `1111` state at 32.3%. The noiseless peak for one iteration on four qubits is 47.3%, and a uniform guess is 6.25%.
+The 2×2 all-2s puzzle on `ibm_torino`, one Grover iteration, measured the correct `1111` state at 32.3%. The noiseless peak for one iteration on four qubits is 47.3%, and a uniform guess is 6.25%. That figure comes from a single 1,024-shot run whose counts and job ID were never archived; the hardware tests now write each run's counts, job ID, backend and transpiled depth to `runs/hardware/`, which is gitignored.
 
 Circuit depth is what limits this. `PhaseOracleGate` compiles the nonogram constraint through general boolean synthesis, and depth grows fast:
 
@@ -24,12 +24,14 @@ Circuit depth is what limits this. `PhaseOracleGate` compiles the nonogram const
 | 3×3 | 9 | ~2,900 | noise dominates; the run only tests the pipeline |
 | 4×4 and up | 16+ | >10,000 | nothing usable comes back |
 
-Noiseless peak probability after k iterations is P(k) = sin²((2k+1)·arcsin(1/√2ⁿ)):
+For M solutions among N = 2ⁿ states, the noiseless probability of measuring a solution after k iterations is P(k) = sin²((2k+1)·arcsin(√(M/N))) (Boyer, Brassard, Høyer & Tapp, [quant-ph/9605034](https://arxiv.org/abs/quant-ph/9605034)). `nonogram.quantum.grover_success_probability` computes it, and `classical_solve` confirms both puzzles below have exactly one solution:
 
-| Grid | k=1 | k=3 | k=5 |
-|------|-----|-----|-----|
-| 2×2 (n=4) | 47.3% | 96.1% | 12.5% |
-| 3×3 (n=9) | 1.7% | 9.3% | 21.8% |
+| Grid | k=1 | k=3 | k=5 | k=9 |
+|------|-----|-----|-----|-----|
+| 2×2 all-2s (N=16) | 47.3% | 96.1% | 12.5% | 99.2% |
+| 3×3 all-3s (N=512) | 1.7% | 9.3% | 21.8% | 55.4% |
+
+P(k) is periodic: for the 2×2 grid it peaks near k=3 and has fallen again by k=5, so more iterations are not automatically better.
 
 ## Setup
 

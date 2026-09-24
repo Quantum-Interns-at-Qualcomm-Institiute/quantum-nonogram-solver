@@ -37,7 +37,7 @@ Run:  pytest tests/test_hardware_2x2.py -v -s
 """
 
 import pytest
-from conftest import load_ibm_token
+from conftest import load_ibm_token, save_hardware_run
 
 pytestmark = pytest.mark.hardware
 
@@ -74,6 +74,7 @@ def test_hardware_2x2_all_twos():
     print("Transpiled circuit depth: ~142 gates.")
     print("Waiting for IBM queue — this may take a few minutes.")
 
+    run_info: dict = {}
     counts, backend_name = quantum_solve_hardware(
         (row_clues, col_clues),
         token=token,
@@ -82,7 +83,10 @@ def test_hardware_2x2_all_twos():
         iterations=GROVER_ITERS,
         dynamical_decoupling=True,
         twirling=True,
+        run_info=run_info,
     )
+    saved = save_hardware_run("2x2-all-twos", (row_clues, col_clues), counts, run_info)
+    print(f"Saved counts and job ID to {saved}")
 
     print(f"\nBackend:           {backend_name}")
     total = sum(counts.values())
