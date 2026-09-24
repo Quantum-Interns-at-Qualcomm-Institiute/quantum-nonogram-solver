@@ -2,18 +2,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml requirements.lock* ./
+COPY pyproject.toml ./
+COPY requirements/py3.12.lock ./requirements/
 COPY nonogram/ nonogram/
 COPY tools/ tools/
 
-# requirements.lock, when present, fixes the exact dependency set so two builds of
-# one commit are the same image. Without it pip resolves pyproject's ranges afresh.
-# Regenerate it with `make lock`.
-RUN if [ -f requirements.lock ]; then \
-      pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .; \
-    else \
-      pip install --no-cache-dir .; \
-    fi
+# The lock fixes the exact dependency set, so two builds of one commit are the same
+# image. It is resolved for this base image's Python; regenerate with `make lock`.
+RUN pip install --no-cache-dir -r requirements/py3.12.lock \
+    && pip install --no-cache-dir --no-deps .
 
 # Drop privileges: nothing here needs root at runtime.
 RUN useradd --create-home --uid 10001 nonogram && chown -R nonogram:nonogram /app
