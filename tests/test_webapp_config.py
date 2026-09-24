@@ -1,45 +1,13 @@
-"""Tests for the webapp config endpoint and app setup."""
+"""Tests for the webapp config endpoint and the state the grid routes keep.
+
+Runs against the deployed app through conftest's `client`: a locally assembled one
+would not carry the front-door guard, the CORS allowlist or the body-size cap.
+"""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import pytest
-from flask import Flask
-from flask_socketio import SocketIO
-
 from tools import state as app_state
 from tools.config import MAX_CLUES, MAX_GRID
-from tools.routes import ALL_BLUEPRINTS
-
-
-@pytest.fixture()
-def app():
-    """Create a Flask app for testing config endpoint."""
-    test_app = Flask(__name__)
-    test_app.config["TESTING"] = True
-    test_app.config["SECRET_KEY"] = "test"
-
-    sio = SocketIO(test_app, async_mode="threading")
-    app_state.init(sio)
-
-    for bp in ALL_BLUEPRINTS:
-        test_app.register_blueprint(bp)
-
-    # Import and register the config route from webapp
-    from tools.webapp import api_config
-
-    test_app.add_url_rule("/api/config", view_func=api_config)
-
-    yield test_app
-
-
-@pytest.fixture()
-def client(app):
-    return app.test_client()
 
 
 class TestConfigEndpoint:
