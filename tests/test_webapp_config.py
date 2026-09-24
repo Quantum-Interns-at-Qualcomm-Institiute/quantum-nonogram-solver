@@ -34,16 +34,6 @@ def app():
 
     test_app.add_url_rule("/api/config", view_func=api_config)
 
-    app_state.state.update(
-        {
-            "rows": 4,
-            "cols": 4,
-            "grid": [[False] * 4 for _ in range(4)],
-            "hw_config": None,
-            "busy": False,
-            "puzzle_name": "puzzle",
-        }
-    )
     yield test_app
 
 

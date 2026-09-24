@@ -49,16 +49,6 @@ def load_ibm_token() -> str | None:
     return None
 
 
-_DEFAULT_STATE = {
-    "rows": 4,
-    "cols": 4,
-    "grid": [[False] * 4 for _ in range(4)],
-    "hw_config": None,
-    "busy": False,
-    "puzzle_name": "puzzle",
-}
-
-
 @pytest.fixture(autouse=True)
 def reset_server_state():
     """Give every test the same server state; the app object is a process-wide singleton.
@@ -70,7 +60,7 @@ def reset_server_state():
     from tools import state as app_state
 
     with app_state.state_lock:
-        app_state.state.update({**_DEFAULT_STATE, "grid": [[False] * 4 for _ in range(4)]})
+        app_state.state.update(app_state.default_state())
     yield
     deadline = time.monotonic() + 60
     while app_state.state["busy"] and time.monotonic() < deadline:
