@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 # Fixtures come from conftest: `client` is the deployed app's test client.
 
 
@@ -204,33 +206,15 @@ class TestSolveDoSGuards:
 
 
 class TestHardwareRoutes:
-    def test_hw_config_connect_disconnect(self, client, monkeypatch):
-        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
-        cfg = {
-            # SECURITY: a client-supplied token must be ignored — the credentials that
-            # spend real quantum credits come from the server environment only.
-            "token": "attacker-supplied",
-            "channel": "ibm_quantum_platform",
-            "backend_name": "ibm_test",
-            "shots": 512,
-        }
-        resp = client.post("/api/hw/config", json=cfg)
-        assert resp.status_code == 200
+    def test_there_is_no_hardware_toggle(self, client):
+        """Hardware is per solve. A server-wide toggle would put one caller's choice
+        on every other caller's run until someone turned it off."""
+        assert client.post("/api/hw/config", json={"backend_name": "ibm_test"}).status_code == 404
 
-        from tools.state import state
+    def test_server_state_holds_no_hardware_config(self):
+        from tools.state import default_state
 
-        assert state["hw_config"] is not None
-        assert state["hw_config"]["backend_name"] == "ibm_test"
-        assert state["hw_config"]["token"] == "server-held-token"  # never the caller's
-
-        # Disconnect
-        resp = client.post("/api/hw/config", json={"disconnect": True})
-        assert resp.status_code == 200
-        assert state["hw_config"] is None
-
-    def test_hw_config_disconnect_via_disconnect_flag(self, client):
-        resp = client.post("/api/hw/config", json={"disconnect": True})
-        assert resp.status_code == 200
+        assert "hw_config" not in default_state()
 
     def test_hw_backends_missing_runtime(self, client, monkeypatch):
         """With server credentials present, a bad token surfaces as 400 from the runtime."""
@@ -246,7 +230,6 @@ class TestHardwareRoutes:
         server relay their token)."""
         monkeypatch.delenv("IBM_QUANTUM_TOKEN", raising=False)
         attacker = {"token": "attacker-supplied", "backend_name": "ibm_test"}
-        assert client.post("/api/hw/config", json=attacker).status_code == 503
         assert client.post("/api/hw/backends", json=attacker).status_code == 503
 
 
@@ -269,3 +252,216 @@ class TestRunsRoutes:
     def test_runs_delete_rejected_when_busy(self, client, busy_solver):
         resp = client.post("/api/runs/delete")
         assert resp.status_code == 409
+
+
+# Hardware is reached per request, and only for a caller the front door vouched for
+
+
+class TestHardwareIsPerRequest:
+    """A solve reaches the QPU only when it asks AND the front door says it may."""
+
+    PUZZLE = {"row_clues": [[2], [2]], "col_clues": [[2], [2]]}
+
+    @pytest.fixture()
+    def spy(self, monkeypatch):
+        """Record every hardware submission instead of calling IBM."""
+        calls = []
+
+        def fake(puzzle, **kwargs):
+            calls.append(kwargs)
+            return {"1111": 1024}, kwargs.get("backend_name") or "ibm_fake"
+
+        import nonogram.quantum
+
+        monkeypatch.setattr(nonogram.quantum, "quantum_solve_hardware", fake)
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
+        return calls
+
+    def _benchmark(self, client, spy, headers):
+        body = {**self.PUZZLE, "trials": 1, "hw": {"backend_name": "ibm_test", "shots": 8}}
+        resp = client.post("/api/benchmark/sync", json=body, headers=headers)
+        assert resp.status_code == 200, resp.get_json()
+        return resp.get_json()
+
+    def test_an_hw_block_alone_stays_on_the_simulator(self, client, spy):
+        payload = self._benchmark(client, spy, headers={})
+        assert spy == []
+        assert payload["hardware"] is None
+
+    def test_the_entitlement_header_reaches_the_qpu(self, client, spy):
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        payload = self._benchmark(client, spy, headers={HW_ALLOWED_HEADER: "1"})
+        assert len(spy) == 1
+        assert spy[0]["token"] == "server-held-token"  # never a caller's
+        assert spy[0]["shots"] == 8
+        assert payload["hardware"] == "ibm_test"
+
+    def test_shots_alone_reaches_the_qpu_on_the_least_busy_device(self, client, spy):
+        """The browser names no backend, so asking for hardware must not require one."""
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        body = {**self.PUZZLE, "trials": 1, "hw": {"shots": 8}}
+        resp = client.post("/api/benchmark/sync", json=body, headers={HW_ALLOWED_HEADER: "1"})
+        assert resp.status_code == 200, resp.get_json()
+        assert len(spy) == 1
+        assert spy[0]["backend_name"] is None  # IBM picks the least busy one
+        assert spy[0]["shots"] == 8
+
+    def test_no_hw_block_stays_on_the_simulator_even_when_entitled(self, client, spy):
+        """Entitlement is not a request: without an "hw" block nothing is submitted."""
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        body = {**self.PUZZLE, "trials": 1}
+        resp = client.post("/api/benchmark/sync", json=body, headers={HW_ALLOWED_HEADER: "1"})
+        assert resp.status_code == 200, resp.get_json()
+        assert spy == []
+
+    def test_one_entitled_run_does_not_entitle_the_next(self, client, spy):
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        self._benchmark(client, spy, headers={HW_ALLOWED_HEADER: "1"})
+        self._benchmark(client, spy, headers={})
+        assert len(spy) == 1  # the second run found no toggle left behind
+
+    def test_a_grid_too_deep_for_hardware_is_refused_before_submission(self, client, spy):
+        """Past MAX_HW_CELLS a job can only return noise, and still costs allowance."""
+        from tools.config import MAX_HW_CELLS
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        side = 3  # 3x3 = 9 cells
+        assert side * side > MAX_HW_CELLS
+        body = {
+            "row_clues": [[3]] * side,
+            "col_clues": [[3]] * side,
+            "trials": 1,
+            "hw": {"backend_name": "ibm_test", "shots": 8},
+        }
+        resp = client.post("/api/benchmark/sync", json=body, headers={HW_ALLOWED_HEADER: "1"})
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "hardware_grid_too_large"
+        assert spy == []  # nothing reached IBM
+
+    def test_the_largest_allowed_grid_still_reaches_the_qpu(self, client, spy):
+        """3x2 is six cells: the deepest circuit still worth measuring."""
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        body = {
+            "row_clues": [[2], [2], [2]],
+            "col_clues": [[3], [3]],
+            "trials": 1,
+            "hw": {"backend_name": "ibm_test", "shots": 8},
+        }
+        resp = client.post("/api/benchmark/sync", json=body, headers={HW_ALLOWED_HEADER: "1"})
+        assert resp.status_code == 200, resp.get_json()
+        assert len(spy) == 1
+
+    def test_an_oversized_grid_without_hardware_is_untouched(self, client, spy):
+        """The ceiling is a hardware rule; the simulator keeps its own limits."""
+        body = {"row_clues": [[3]] * 3, "col_clues": [[3]] * 3, "trials": 1}
+        assert client.post("/api/benchmark/sync", json=body).status_code == 200
+        assert spy == []
+
+
+# Submit and collect are separate calls, so an IBM queue holds nobody
+
+
+class TestHardwareJobLifecycle:
+    """POST /api/hw/jobs hands back an id; GET /api/hw/jobs/<id> answers later."""
+
+    PUZZLE = {"row_clues": [[2], [2]], "col_clues": [[2], [2]]}
+
+    @pytest.fixture()
+    def ibm(self, monkeypatch):
+        """Stand in for IBM: record submissions, answer collections from a script."""
+        state = {"submitted": [], "status": "QUEUED", "counts": {"1111": 8}}
+
+        def fake_submit(puzzle, **kwargs):
+            state["submitted"].append(kwargs)
+            return {
+                "job_id": "job-abc",
+                "backend": kwargs.get("backend_name") or "ibm_fake",
+                "shots": kwargs.get("shots"),
+                "iterations": 1,
+                "transpiled_depth": 139,
+                "creg_names": ["meas"],
+            }
+
+        def fake_collect(job_id, token, channel="ibm_quantum_platform"):
+            done = state["status"] == "DONE"
+            return {
+                "status": state["status"],
+                "done": done,
+                "counts": state["counts"] if done else None,
+                "backend": "ibm_fake",
+            }
+
+        import nonogram.quantum
+
+        monkeypatch.setattr(nonogram.quantum, "submit_hardware_job", fake_submit)
+        monkeypatch.setattr(nonogram.quantum, "collect_hardware_job", fake_collect)
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
+        return state
+
+    def _submit(self, client, entitled=True):
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        headers = {HW_ALLOWED_HEADER: "1"} if entitled else {}
+        body = {**self.PUZZLE, "hw": {"backend_name": "ibm_test", "shots": 8}}
+        return client.post("/api/hw/jobs", json=body, headers=headers)
+
+    def test_submitting_returns_an_id_without_waiting(self, client, ibm):
+        resp = self._submit(client)
+        assert resp.status_code == 202
+        payload = resp.get_json()
+        assert payload["job_id"] == "job-abc"
+        assert payload["transpiled_depth"] == 139
+        assert len(ibm["submitted"]) == 1
+        assert ibm["submitted"][0]["token"] == "server-held-token"
+
+    def test_the_solver_is_free_again_once_the_job_is_queued(self, client, ibm):
+        from tools.state import state
+
+        self._submit(client)
+        assert state["busy"] is False  # the IBM queue holds nothing here
+
+    def test_an_unentitled_submission_reaches_no_hardware(self, client, ibm):
+        resp = self._submit(client, entitled=False)
+        assert resp.status_code == 403
+        assert resp.get_json()["error"]["code"] == "hardware_not_allowed"
+        assert ibm["submitted"] == []
+
+    def test_a_grid_too_deep_is_refused_before_submission(self, client, ibm):
+        from tools.routes.solver import HW_ALLOWED_HEADER
+
+        body = {
+            "row_clues": [[3]] * 3,
+            "col_clues": [[3]] * 3,
+            "hw": {"backend_name": "ibm_test", "shots": 8},
+        }
+        resp = client.post("/api/hw/jobs", json=body, headers={HW_ALLOWED_HEADER: "1"})
+        assert resp.status_code == 400
+        assert resp.get_json()["error"]["code"] == "hardware_grid_too_large"
+        assert ibm["submitted"] == []
+
+    def test_collecting_a_queued_job_reports_that_it_is_waiting(self, client, ibm):
+        resp = client.get("/api/hw/jobs/job-abc")
+        assert resp.status_code == 200
+        assert resp.get_json() == {
+            "status": "QUEUED",
+            "done": False,
+            "counts": None,
+            "backend": "ibm_fake",
+        }
+
+    def test_collecting_a_finished_job_returns_its_counts(self, client, ibm):
+        ibm["status"] = "DONE"
+        payload = client.get("/api/hw/jobs/job-abc").get_json()
+        assert payload["done"] is True
+        assert payload["counts"] == {"1111": 8}
+
+    def test_collecting_needs_only_the_id(self, client, ibm):
+        """Nothing is carried between the two calls, so a reload can still collect."""
+        ibm["status"] = "DONE"
+        assert client.get("/api/hw/jobs/job-abc").get_json()["counts"] == {"1111": 8}
+        assert ibm["submitted"] == []  # collected without ever submitting in this test

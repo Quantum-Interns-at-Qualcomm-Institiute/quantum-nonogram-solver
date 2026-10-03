@@ -19,11 +19,11 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, has_request_context, jsonify, request
 
 from nonogram.errors import ValidationError
 from tools.chart import measurement_rows, render_chart_b64, render_histogram_b64, report_to_dict
-from tools.config import MAX_CLUES, MAX_TRIALS, RUNS_DIR
+from tools.config import MAX_CLUES, MAX_HW_CELLS, MAX_TRIALS, RUNS_DIR
 from tools.errors import json_object, require_int, respond_error
 from tools.state import emit_status, set_busy, state, state_lock
 
@@ -115,18 +115,69 @@ def _parse_clues(data: dict) -> tuple[list, list, int, int]:
     return row_clues, col_clues, len(row_clues), len(col_clues)
 
 
+#: Set by the front door once it has decided this caller may spend quantum credits.
+HW_ALLOWED_HEADER = "X-HW-Allowed"
+
+
+def _client_room(data: dict) -> str | None:
+    """The Socket.IO room a result belongs to, or None to send it nowhere.
+
+    A client joins a room named by its own `client_id`, which it keeps across a
+    reload; `sid` is the older name for the same idea and changes on reconnect.
+    Without one, results are addressed to nobody rather than to everybody.
+    """
+    if not isinstance(data, dict):
+        return None
+    room = data.get("client_id") or data.get("sid")
+    return str(room) if room else None
+
+
+def _hw_entitled() -> bool:
+    """True when the front door marked this request as allowed to reach IBM.
+
+    The origin guard admits only the gateway, so the header cannot be set by a
+    browser: it arrives already stripped and re-set per request. Off the request
+    path there is no front door and so no entitlement.
+    """
+    return has_request_context() and request.headers.get(HW_ALLOWED_HEADER) == "1"
+
+
+def _hw_or_error(data: dict, rows: int, cols: int):
+    """The hardware config for this request, or the error that refuses it.
+
+    Refused before submission rather than after: a job too deep to return anything but
+    noise still spends its share of a 10-minute monthly allowance. Refused rather than
+    quietly downgraded, too — a caller asking for a QPU should not be handed a
+    simulator result without being told.
+    """
+    hw_cfg = _request_hw_cfg(data)
+    if hw_cfg and rows * cols > MAX_HW_CELLS:
+        return None, respond_error(
+            "hardware_grid_too_large",
+            f"Hardware runs stop at {MAX_HW_CELLS} cells — deeper circuits return noise.",
+            400,
+        )
+    return hw_cfg, None
+
+
 def _request_hw_cfg(data: dict) -> dict | None:
-    """Per-request hardware config (preferred over the global toggle).
+    """Per-request hardware config, or None to run on the simulator.
 
     The request may carry {"hw": {"backend_name": ..., "shots": ...}} — the
     token always comes from the server environment and shots are capped, so a
-    caller chooses parameters but never credentials or unbounded spend. Falls
-    back to the global hw_config state for the existing UI flow.
+    caller chooses parameters but never credentials or unbounded spend. Hardware
+    is per request: one caller's run can never put anyone else's on the QPU.
+
+    The "hw" key is what asks for hardware. Naming a backend is optional: without
+    one the least-busy operational device is chosen, which is what a caller with
+    no reason to prefer a machine wants.
     """
     from tools.routes.hardware import MAX_SHOTS, _ibm_channel, _ibm_token
 
+    if not _hw_entitled():
+        return None
     hw_req = data.get("hw") if isinstance(data, dict) else None
-    if isinstance(hw_req, dict) and hw_req.get("backend_name"):
+    if isinstance(hw_req, dict):
         token = _ibm_token()
         if not token:
             return None
@@ -134,21 +185,18 @@ def _request_hw_cfg(data: dict) -> dict | None:
             shots = int(hw_req.get("shots", 1024))
         except (TypeError, ValueError):
             shots = 1024
+        requested = hw_req.get("backend_name")
         return {
             "token": token,
             "channel": _ibm_channel(hw_req),
-            "backend_name": str(hw_req["backend_name"]),
+            "backend_name": str(requested) if requested else None,
             "shots": min(MAX_SHOTS, max(1, shots)),
         }
-    with state_lock:
-        return state.get("hw_config")
+    return None
 
 
 def _get_quantum_solver(hw_cfg=None):
-    """Build the appropriate quantum Solver (per-request config, else global)."""
-    if hw_cfg is None:
-        with state_lock:
-            hw_cfg = state.get("hw_config")
+    """Build the quantum Solver this request asked for: hardware, else simulator."""
     if hw_cfg:
         from nonogram.solver import QuantumHardwareSolver
 
@@ -315,8 +363,7 @@ def api_solve_classical():
     if busy is not None:
         return busy
 
-    # Scope result emits to the requesting client when it tells us its sid.
-    to = request.json.get("sid") or None
+    to = _client_room(request.json)
 
     from nonogram.solver import ClassicalSolver
 
@@ -357,8 +404,12 @@ def api_solve_quantum():
     if busy is not None:
         return busy
 
-    to = data.get("sid") or None
-    solver = _get_quantum_solver(_request_hw_cfg(data))
+    to = _client_room(data)
+    hw_cfg, hw_err = _hw_or_error(data, rows, cols)
+    if hw_err is not None:
+        set_busy(False)
+        return hw_err
+    solver = _get_quantum_solver(hw_cfg)
     emit_status(f"{solver.name} running…", "warn", to=to)
 
     def _work():
@@ -407,8 +458,11 @@ def api_benchmark():
     busy = _acquire_or_busy()
     if busy is not None:
         return busy
-    to = data.get("sid") or None
-    hw_cfg = _request_hw_cfg(data)
+    to = _client_room(data)
+    hw_cfg, hw_err = _hw_or_error(data, rows, cols)
+    if hw_err is not None:
+        set_busy(False)
+        return hw_err
     label = f"{trials} trial{'s' if trials > 1 else ''}"
     emit_status(f"Benchmarking both solvers ({label}) — please wait…", "warn", to=to)
 
@@ -469,7 +523,11 @@ def api_solve_quantum_sync():
         row_clues, col_clues, rows, cols, err = _parse_validated_clues()
         if err is not None:
             return err
-        result = _get_quantum_solver().solve((row_clues, col_clues))
+        data = json_object(request.json or {})
+        hw_cfg, hw_err = _hw_or_error(data, rows, cols)
+        if hw_err is not None:
+            return hw_err
+        result = _get_quantum_solver(hw_cfg).solve((row_clues, col_clues))
         return jsonify(_quantum_payload(result["counts"], rows, cols, request.json))
     except Exception as exc:
         return respond_error("solve_error", _sanitize_error(exc), 500)
@@ -491,8 +549,9 @@ def api_benchmark_sync():
             trials = _trials(json_object(request.json or {}))
         except ValidationError as exc:
             return respond_error("invalid_trials", str(exc), 400)
-        with state_lock:
-            hw_cfg = state.get("hw_config")
+        hw_cfg, hw_err = _hw_or_error(json_object(request.json or {}), rows, cols)
+        if hw_err is not None:
+            return hw_err
         payload = _run_benchmark(row_clues, col_clues, rows, cols, trials, hw_cfg)
         return jsonify(payload)
     except Exception as exc:

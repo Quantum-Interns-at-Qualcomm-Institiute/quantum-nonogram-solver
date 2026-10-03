@@ -57,7 +57,7 @@ class QuantumHardwareSolver:
     def __init__(
         self,
         token: str,
-        backend_name: str,
+        backend_name: str | None = None,
         channel: str = "ibm_quantum_platform",
         shots: int = 1024,
     ) -> None:
@@ -68,7 +68,9 @@ class QuantumHardwareSolver:
 
     @property
     def name(self) -> str:
-        return f"Quantum (Hardware: {self._backend_name})"
+        # The device is only known after submission when none was named.
+        where = self._backend_name or "least busy"
+        return f"Quantum (Hardware: {where})"
 
     def solve(self, puzzle: Puzzle) -> dict[str, Any]:
         try:

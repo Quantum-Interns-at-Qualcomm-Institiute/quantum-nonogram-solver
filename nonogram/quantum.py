@@ -7,7 +7,7 @@ Two execution paths are provided:
       Runs entirely locally using Qiskit's StatevectorSampler (exact simulation).
       No IBM account required.
 
-  quantum_solve_hardware(puzzle, token, ...)
+  submit_hardware_job(puzzle, token, ...) / collect_hardware_job(job_id, token, ...)
       Transpiles the Grover circuit and submits it to a real IBM quantum backend
       (or an IBM cloud simulator) via qiskit-ibm-runtime.
       Requires:  pip install qiskit-ibm-runtime
@@ -66,27 +66,63 @@ def grover_success_probability(iterations: int, n_solutions: int, n_states: int)
     return math.sin((2 * iterations + 1) * theta) ** 2
 
 
+#: Transpiled layers an Eagle or Heron device holds before decoherence dominates.
+HW_DEPTH_BUDGET = 200
+
+
+def _solution_count(puzzle) -> int:
+    """How many assignments satisfy *puzzle*, or one when it cannot be counted."""
+    try:
+        from nonogram.classical import classical_solve
+
+        return max(1, len(classical_solve(puzzle)))
+    except Exception:
+        return 1
+
+
+def _choose_iterations(puzzle, problem, backend, transpile_fn, num_solutions: int) -> int:
+    """How many Grover iterations this device can carry for this puzzle.
+
+    Amplification wants the count that maximises the ideal probability; the
+    hardware wants the shallowest circuit. Depth grows very nearly linearly in
+    the iteration count, so one transpile at k=1 measures the per-iteration
+    cost and the budget decides how many fit. Never returns less than one: a
+    single iteration is the smallest thing worth submitting.
+    """
+    from qiskit_algorithms import Grover
+
+    num_qubits = len(puzzle[0]) * len(puzzle[1])
+    ideal = Grover.optimal_num_iterations(num_solutions=num_solutions, num_qubits=num_qubits)
+
+    one = transpile_fn(
+        Grover(iterations=1).construct_circuit(problem, measurement=True),
+        backend=backend,
+        optimization_level=3,
+    )
+    per_iteration = max(1, one.depth())
+    return max(1, min(ideal, HW_DEPTH_BUDGET // per_iteration))
+
+
 # Real hardware path (IBM Qiskit Runtime)
 
 
 # One parameter per hardware-run knob; a config object would only rename them.
-def quantum_solve_hardware(  # noqa: PLR0913
+def submit_hardware_job(  # noqa: PLR0913
     puzzle: tuple[list, list],
     token: str,
     backend_name: str | None = None,
     channel: str = "ibm_quantum_platform",
     shots: int = 1024,
-    iterations: int = 1,
+    iterations: int | None = None,
     dynamical_decoupling: bool = True,
     twirling: bool = True,
     run_info: dict | None = None,
-) -> tuple[dict[str, int], str]:
-    """Solve a nonogram using Grover's algorithm on real IBM quantum hardware.
+) -> dict:
+    """Build, transpile and submit the Grover circuit; return once IBM has the job.
 
-    The Grover circuit is constructed, transpiled to the backend's native gate
-    set, and submitted via qiskit-ibm-runtime.  The job is synchronous from
-    the caller's perspective (``job.result()`` blocks until the IBM job
-    completes).
+    Returns without waiting, so a caller holds no thread while the job sits in
+    IBM's queue — which can be minutes. ``collect_hardware_job`` fetches the
+    result later, from the returned ``job_id`` alone.
 
     Grover iteration count guidance
     --------------------------------
@@ -117,9 +153,10 @@ def quantum_solve_hardware(  # noqa: PLR0913
                               (default, qiskit-ibm-runtime ≥ 0.30) or
                               ``"ibm_cloud"``.
         shots:                Number of measurement shots (default 1024).
-        iterations:           Grover iteration count (default 1).  Increase to
-                              3 for cleaner signal on 9-qubit (3 × 3) puzzles;
-                              lower values keep the circuit shallower.
+        iterations:           Grover iteration count.  ``None`` (the default)
+                              picks the largest count whose transpiled depth
+                              fits ``HW_DEPTH_BUDGET``, never exceeding the
+                              count that maximises the ideal probability.
         dynamical_decoupling: Enable IBM Runtime dynamical-decoupling pulse
                               sequences (default True).  Suppresses idle-qubit
                               decoherence.
@@ -159,6 +196,10 @@ def quantum_solve_hardware(  # noqa: PLR0913
     expression = puzzle_to_boolean(row_clues=puzzle[0], col_clues=puzzle[1])
     oracle = PhaseOracleGate(expression)
     problem = AmplificationProblem(oracle)
+
+    num_solutions = _solution_count(puzzle)
+    if iterations is None:
+        iterations = _choose_iterations(puzzle, problem, backend, _transpile, num_solutions)
 
     # construct_circuit returns an unmeasured QuantumCircuit; we add measurements.
     grover = Grover(iterations=iterations)
@@ -203,18 +244,94 @@ def quantum_solve_hardware(  # noqa: PLR0913
             pass
 
     job = sampler.run([transpiled])
-    result = job.result()  # blocks until IBM job is complete
-
-    counts = extract_counts(result[0].data, creg_names)
+    submitted = {
+        "job_id": job.job_id(),
+        "backend": backend.name,
+        "shots": shots,
+        "iterations": iterations,
+        "ideal_probability": grover_success_probability(
+            iterations, num_solutions, 2 ** (len(puzzle[0]) * len(puzzle[1]))
+        ),
+        "transpiled_depth": transpiled.depth(),
+        "creg_names": creg_names,
+    }
     if run_info is not None:
-        run_info.update(
-            job_id=job.job_id(),
-            backend=backend.name,
-            shots=shots,
-            iterations=iterations,
-            transpiled_depth=transpiled.depth(),
-        )
-    return counts, backend.name
+        run_info.update(submitted)
+    return submitted
+
+
+#: Job states IBM reports once a job will produce nothing more.
+TERMINAL_STATES = frozenset({"DONE", "ERROR", "CANCELLED"})
+
+
+def collect_hardware_job(
+    job_id: str,
+    token: str,
+    channel: str = "ibm_quantum_platform",
+) -> dict:
+    """Ask IBM what became of a submitted job.
+
+    Takes the job id and nothing else: ``extract_counts`` finds the measurement
+    register by scanning the result when it is not named, so no state has to be
+    carried between submitting and collecting. A caller that kept only the id can
+    still retrieve the run after a reload, or after this process restarted.
+
+    Returns ``{"status": ..., "done": bool, "counts": ... | None, "backend": ...}``.
+    """
+    from qiskit_ibm_runtime import QiskitRuntimeService
+
+    service = QiskitRuntimeService(channel=channel, token=token)
+    try:
+        job = service.job(job_id)
+    except Exception as exc:
+        raise HardwareError(f"No such job: {job_id}") from exc
+
+    status = str(getattr(job.status(), "name", job.status()))
+    backend = getattr(getattr(job, "backend", lambda: None)(), "name", None)
+    out = {"status": status, "done": status in TERMINAL_STATES, "counts": None, "backend": backend}
+    if status != "DONE":
+        return out
+
+    result = job.result()
+    out["counts"] = extract_counts(result[0].data, [])
+    return out
+
+
+def quantum_solve_hardware(  # noqa: PLR0913
+    puzzle: tuple[list, list],
+    token: str,
+    backend_name: str | None = None,
+    channel: str = "ibm_quantum_platform",
+    shots: int = 1024,
+    iterations: int | None = None,
+    dynamical_decoupling: bool = True,
+    twirling: bool = True,
+    run_info: dict | None = None,
+) -> tuple[dict[str, int], str]:
+    """Submit and wait, for callers that want one blocking call.
+
+    The web routes do not use this — a solver thread held for the length of an IBM
+    queue is a solver nobody else can use. It stays for scripts and the hardware
+    tests, where blocking is what is wanted.
+    """
+    submitted = submit_hardware_job(
+        puzzle,
+        token,
+        backend_name=backend_name,
+        channel=channel,
+        shots=shots,
+        iterations=iterations,
+        dynamical_decoupling=dynamical_decoupling,
+        twirling=twirling,
+        run_info=run_info,
+    )
+    from qiskit_ibm_runtime import QiskitRuntimeService
+
+    service = QiskitRuntimeService(channel=channel, token=token)
+    job = service.job(submitted["job_id"])
+    result = job.result()  # blocks until IBM job is complete
+    counts = extract_counts(result[0].data, submitted["creg_names"])
+    return counts, submitted["backend"]
 
 
 def extract_counts(data, creg_names: list[str]) -> dict[str, int]:

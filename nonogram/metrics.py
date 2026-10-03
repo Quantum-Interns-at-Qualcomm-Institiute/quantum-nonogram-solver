@@ -329,7 +329,28 @@ class ComparisonReport:
 # Static circuit analysis
 
 
-def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
+def basis_metrics(circuit):
+    """Depth and gate counts of *circuit* expressed in a standard gate set.
+
+    ``construct_circuit`` appends the Grover operator as one opaque gate per
+    iteration, so the circuit's own ``depth()`` counts iterations rather than
+    gates. Translating to u/cx first gives a depth that describes the work.
+    Optimization level 0 keeps it a translation: no layout, no routing, and so
+    no seed to pin and nothing device-specific.
+
+    Returns
+    -------
+    tuple[int, int, int, dict]
+        (depth, total gate count, two-qubit gate count, counts by type).
+    """
+    from qiskit import transpile
+
+    flat = transpile(circuit, basis_gates=["u", "cx"], optimization_level=0)
+    ops = flat.count_ops()
+    return flat.depth(), sum(ops.values()), flat.num_nonlocal_gates(), dict(ops)
+
+
+def analyze_circuit(puzzle: tuple[list, list], num_solutions: int = 1) -> StaticCircuitAnalysis:
     """Build the Grover circuit for *puzzle* and extract static metrics.
 
     This constructs the circuit and measures gate counts, depth, and
@@ -340,6 +361,10 @@ def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
     ----------
     puzzle : tuple[list, list]
         (row_clues, col_clues) tuple.
+    num_solutions : int
+        How many assignments satisfy the puzzle. The iteration count that
+        amplifies them depends on it, so a caller that has solved the puzzle
+        should pass the real count.
 
     Returns
     -------
@@ -353,22 +378,23 @@ def analyze_circuit(puzzle: tuple[list, list]) -> StaticCircuitAnalysis:
     oracle = PhaseOracleGate(expression)
     problem = AmplificationProblem(oracle)
 
+    num_problem = len(puzzle[0]) * len(puzzle[1])
+    # The search runs over the puzzle's cells; the oracle's own width includes
+    # ancillas, which are not part of the space being searched.
     iterations_used = Grover.optimal_num_iterations(
-        num_solutions=1, num_qubits=oracle.num_qubits
+        num_solutions=max(1, num_solutions), num_qubits=num_problem
     )
     grover = Grover(iterations=iterations_used)
     circuit = grover.construct_circuit(problem, measurement=False)
 
-    ops = circuit.count_ops()
-    two_qubit = circuit.num_nonlocal_gates()
+    depth, total, two_qubit, ops = basis_metrics(circuit)
 
-    num_problem = len(puzzle[0]) * len(puzzle[1])
     return StaticCircuitAnalysis(
         num_qubits=circuit.num_qubits,
-        circuit_depth=circuit.depth(),
-        total_gate_count=sum(ops.values()),
+        circuit_depth=depth,
+        total_gate_count=total,
         two_qubit_gate_count=two_qubit,
-        gate_counts_by_type=dict(ops),
+        gate_counts_by_type=ops,
         grover_iterations=iterations_used,
         problem_qubits=num_problem,
     )
@@ -533,16 +559,19 @@ def benchmark(  # noqa: PLR0915
         t_circ = time.perf_counter()
         oracle = PhaseOracleGate(expression)
         problem = AmplificationProblem(oracle)
-        grover = Grover(sampler=StatevectorSampler())
 
+        # The iteration count depends on how many solutions there are to amplify.
+        num_solutions = len(classical_solutions_bs) if run_classical else 1
         iterations_used = Grover.optimal_num_iterations(
-            num_solutions=1, num_qubits=oracle.num_qubits
+            num_solutions=max(1, num_solutions), num_qubits=num_vars
         )
+        # Fixed rather than left to the growth schedule, so the circuit measured
+        # below is the circuit that runs and the reported count is the one used.
+        grover = Grover(sampler=StatevectorSampler(), iterations=iterations_used)
         circuit = grover.construct_circuit(problem, power=iterations_used, measurement=False)
         circuit_construction_time = time.perf_counter() - t_circ
 
-        ops = circuit.count_ops()
-        two_qubit = circuit.num_nonlocal_gates()
+        depth, total_gates, two_qubit, ops = basis_metrics(circuit)
 
         tracemalloc.start()
         t0 = time.perf_counter()
@@ -567,10 +596,10 @@ def benchmark(  # noqa: PLR0915
         quantum_metrics = QuantumMetrics(
             solve_time_s=elapsed,
             num_qubits=circuit.num_qubits,
-            circuit_depth=circuit.depth(),
-            total_gate_count=sum(ops.values()),
+            circuit_depth=depth,
+            total_gate_count=total_gates,
             two_qubit_gate_count=two_qubit,
-            gate_counts_by_type=dict(ops),
+            gate_counts_by_type=ops,
             grover_iterations=iterations_used,
             top_result_probability=top_prob,
             oracle_evaluation_correct=oracle_correct,
@@ -587,7 +616,9 @@ def benchmark(  # noqa: PLR0915
 
     # Static circuit analysis
     if static_analysis:
-        static_circuit = analyze_circuit(puzzle)
+        static_circuit = analyze_circuit(
+            puzzle, num_solutions=len(classical_solutions_bs) if run_classical else 1
+        )
 
     # Constraint density
     if compute_constraint_density:

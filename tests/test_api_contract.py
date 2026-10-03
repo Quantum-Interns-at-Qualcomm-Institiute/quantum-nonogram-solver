@@ -130,22 +130,17 @@ class TestBenchmarkAPIContract:
 
 
 class TestHardwareAPIContract:
-    """POST /api/hw/config and /api/hw/backends."""
+    """POST /api/hw/backends. Hardware itself is chosen per solve, not by a toggle."""
 
-    def test_connect_response(self, client, monkeypatch):
-        # Credentials come from the environment; the request body carries none.
-        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
-        cfg = {
-            "channel": "ibm_quantum_platform",
-            "backend_name": "ibm_test",
-            "shots": 1024,
-        }
-        resp = client.post("/api/hw/config", json=cfg)
-        assert resp.status_code == 200
+    def test_no_server_wide_hardware_toggle(self, client):
+        """A toggle would put one caller's choice on everybody else's solve."""
+        assert client.post("/api/hw/config", json={"backend_name": "ibm_test"}).status_code == 404
 
-    def test_disconnect_response(self, client):
-        resp = client.post("/api/hw/config", json={"disconnect": True})
-        assert resp.status_code == 200
+    def test_backends_needs_server_credentials(self, client, monkeypatch):
+        monkeypatch.delenv("IBM_QUANTUM_TOKEN", raising=False)
+        resp = client.post("/api/hw/backends", json={})
+        assert resp.status_code == 503
+        assert resp.get_json()["error"]["code"] == "hardware_unconfigured"
 
 
 class TestRunsAPIContract:

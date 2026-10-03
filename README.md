@@ -119,16 +119,27 @@ The classical solver walks all 2^(n·d) candidates and evaluates the clause list
 
 ## Running on IBM hardware
 
-Install `qiskit-ibm-runtime` and set `IBM_QUANTUM_TOKEN` in the environment, or put `IBM_QUANTUM_TOKEN=...` in a `.env` file at the repo root. The server holds the token: `/api/hw/backends` and `/api/hw/config` never accept one from a caller, so nobody else can spend the account's credits. With no token configured those routes answer 503 and the solver stays on the local simulator. From Python:
+Install `qiskit-ibm-runtime` and set `IBM_QUANTUM_TOKEN` in the environment, or put `IBM_QUANTUM_TOKEN=...` in a `.env` file at the repo root. The server holds the token: `/api/hw/backends` and `/api/hw/jobs` never accept one from a caller, so nobody else can spend the account's credits. With no token configured those routes answer 503 and the solver stays on the local simulator.
+
+Which run reaches the QPU is decided per request, by the front door. A solve carries an `hw` block *and* arrives with `X-HW-Allowed: 1`, or it runs on the simulator; there is no server-wide switch, so one caller's choice can never put anyone else's solve on hardware. Grids past `MAX_HW_CELLS` (6) are refused before submission — see the depth table above.
+
+Over HTTP the submission and the result are separate calls, because an IBM queue can run to minutes and the solver is single-threaded:
+
+```
+POST /api/hw/jobs        → 202 {job_id, backend, shots, iterations, transpiled_depth}
+GET  /api/hw/jobs/<id>   → {status, done, counts|null, backend}
+```
+
+The submit holds the solver lock only long enough to hand the job to IBM. Collecting takes no lock and needs nothing but the id, so a client that reloaded can still retrieve its run. From Python:
 
 ```python
-from nonogram.quantum import quantum_solve_hardware, list_backends
+from nonogram.quantum import submit_hardware_job, collect_hardware_job, list_backends
 
 backends = list_backends(token="...", channel="ibm_quantum_platform")
 for name, qubits, pending in backends:
     print(f"{name:26s}  {qubits:3d}q  queue: {pending}")
 
-counts, backend_name = quantum_solve_hardware(
+submitted = submit_hardware_job(
     puzzle=([(2,), (2,)], [(2,), (2,)]),
     token="...",
     channel="ibm_quantum_platform",
@@ -137,6 +148,13 @@ counts, backend_name = quantum_solve_hardware(
     dynamical_decoupling=True,   # suppress idle-qubit decoherence
     twirling=True,               # Pauli gate + measurement twirling
 )
+print(submitted["job_id"], submitted["transpiled_depth"])
+
+# Later, from the id alone — no state is carried between the two calls.
+done = collect_hardware_job(submitted["job_id"], token="...")
+counts = done["counts"]
+
+# quantum_solve_hardware() still does both in one blocking call, for scripts.
 
 # Qiskit returns little-endian bitstrings; reverse for row-major order
 for bs, count in sorted(counts.items(), key=lambda x: -x[1])[:5]:
