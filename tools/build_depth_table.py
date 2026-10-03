@@ -22,6 +22,7 @@ from __future__ import annotations
 import itertools
 import json
 import sys
+from pathlib import Path
 
 MAX_SIDE = 3
 #: Transpiler seeds tried per row; the shallowest is kept and the spread recorded. A seed
@@ -299,7 +300,7 @@ if __name__ == "__main__":
     json.dump(summary, sys.stdout, indent=1)
     sys.stdout.write("\n")
     # Nothing on the page reads the raw sweep, so it sits beside the summary.
-    runs_path = sys.argv[1] if len(sys.argv) > 1 else "depth-table-runs.json"
-    with open(runs_path, "w") as handle:
+    runs_path = Path(sys.argv[1] if len(sys.argv) > 1 else "depth-table-runs.json")
+    with runs_path.open("w") as handle:
         json.dump(runs, handle, indent=1)
     print(f"wrote {runs_path}", file=sys.stderr)

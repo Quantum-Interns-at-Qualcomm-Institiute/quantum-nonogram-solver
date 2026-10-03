@@ -26,12 +26,9 @@ def _lines(
 ) -> list[tuple[list[int], tuple[int, ...]]]:
     """Every row and column, as the cell indices it covers and the clue it must match."""
     rows, cols = len(row_clues), len(col_clues)
-    lines: list[tuple[list[int], tuple[int, ...]]] = []
-    for r in range(rows):
-        lines.append(([r * cols + c for c in range(cols)], tuple(row_clues[r])))
-    for c in range(cols):
-        lines.append(([r * cols + c for r in range(rows)], tuple(col_clues[c])))
-    return lines
+    return [
+        ([r * cols + c for c in range(cols)], tuple(row_clues[r])) for r in range(rows)
+    ] + [([r * cols + c for r in range(rows)], tuple(col_clues[c])) for c in range(cols)]
 
 
 def clue_oracle_circuit(row_clues: list[tuple[int, ...]], col_clues: list[tuple[int, ...]]):
@@ -60,7 +57,7 @@ def clue_oracle_circuit(row_clues: list[tuple[int, ...]], col_clues: list[tuple[
         for flag, (qubits, clue) in enumerate(lines):
             for pattern in _generate_patterns(len(qubits), clue):
                 # _generate_patterns and ctrl_state both put the leftmost cell in bit 0.
-                qc.append(MCXGate(len(qubits), ctrl_state=pattern), qubits + [cells + flag])
+                qc.append(MCXGate(len(qubits), ctrl_state=pattern), [*qubits, cells + flag])
 
     mark()
     qc.append(ZGate().control(len(lines) - 1), [cells + i for i in range(len(lines))])

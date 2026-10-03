@@ -67,5 +67,9 @@ max-complexity = 10
 "nonogram/metrics.py" = ["T201", "N806"]
 "nonogram/core.py" = ["T201", "N806"]
 "tools/benchmark_comparison.py" = ["T201"]
+"tools/build_depth_table.py" = ["T201"]
+# A measurement notebook reports by printing, imports beside the prose that
+# introduces each stage, and checks its own results with asserts.
+"tools/*.ipynb" = ["T201", "E402", "S101"]
 # One parameter per field of the bench payload these routes assemble.
 "tools/routes/solver.py" = ["PLR0913"]
