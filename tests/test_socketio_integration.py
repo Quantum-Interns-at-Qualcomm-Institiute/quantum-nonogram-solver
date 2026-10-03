@@ -186,3 +186,35 @@ class TestMeasurementHistogram:
         assert len(events) == 1
         assert events[0]["outcomes"][0]["grid"] == "1111"
         assert events[0]["chart_img"]
+
+
+# One client's results are addressed to that client, never to the room next door
+
+
+def test_results_go_only_to_the_client_that_asked(webapp, client, sio_client):
+    """Two tabs, one solve: the other tab must not receive somebody else's puzzle."""
+    from flask_socketio import SocketIOTestClient
+
+    from tools.webapp import socketio
+
+    mine = "client-mine"
+    sio_client.emit("join", {"client_id": mine})
+
+    bystander = SocketIOTestClient(webapp, socketio)
+    try:
+        bystander.emit("join", {"client_id": "client-theirs"})
+        bystander.get_received()  # drain the connect frames
+
+        body = {"row_clues": [[1]], "col_clues": [[1]], "client_id": mine}
+        assert client.post("/api/solve/classical", json=body).status_code == 200
+
+        assert collect_events(sio_client, "cl_done", timeout=60)
+        names = [item["name"] for item in bystander.get_received()]
+        # Neither the result nor the line that counts its solutions.
+        assert "cl_done" not in names
+        assert "status" not in names
+        # The shared solver's state is still everyone's business, and receiving it
+        # proves a broadcast would have reached this client.
+        assert "busy" in names
+    finally:
+        bystander.disconnect()

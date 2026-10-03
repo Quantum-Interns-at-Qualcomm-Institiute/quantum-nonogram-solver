@@ -119,12 +119,6 @@ class TestMalformedFieldsAre400:
         assert resp.status_code == 400
         assert resp.get_json()["error"]["code"] == code
 
-    def test_hardware_shots(self, client, monkeypatch):
-        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
-        resp = client.post("/api/hw/config", json={"backend_name": "b", "shots": "lots"})
-        assert resp.status_code == 400
-        assert resp.get_json()["error"]["code"] == "invalid_shots"
-
     def test_puzzle_save_non_string_name(self, client):
         resp = client.post(
             "/api/puzzle/save", json={"row_clues": [[1]], "col_clues": [[1]], "name": 5}
@@ -188,20 +182,35 @@ class TestRunArtifactCap:
 
 
 class TestRequestHwConfig:
-    """Per-request hardware config never carries caller credentials, caps shots."""
+    """Per-request hardware config: entitled callers only, server credentials, capped shots."""
+
+    @staticmethod
+    def _cfg(body, entitled=True):
+        from tools.routes.solver import HW_ALLOWED_HEADER, _request_hw_cfg
+        from tools.webapp import app
+
+        headers = {HW_ALLOWED_HEADER: "1"} if entitled else {}
+        with app.test_request_context(json=body, headers=headers):
+            return _request_hw_cfg(body)
 
     def test_no_token_means_no_hw(self, monkeypatch):
-        from tools.routes.solver import _request_hw_cfg
-
         monkeypatch.delenv("IBM_QUANTUM_TOKEN", raising=False)
-        assert _request_hw_cfg({"hw": {"backend_name": "ibm_x"}}) is None
+        assert self._cfg({"hw": {"backend_name": "ibm_x"}}) is None
+
+    def test_unentitled_request_stays_on_the_simulator(self, monkeypatch):
+        """Without the front door's header the hw block is ignored, token or not."""
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
+        assert self._cfg({"hw": {"backend_name": "ibm_x"}}, entitled=False) is None
+
+    def test_no_hw_block_means_no_hw(self, monkeypatch):
+        monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
+        assert self._cfg({"trials": 1}) is None
 
     def test_token_from_server_shots_capped(self, monkeypatch):
         from tools.routes.hardware import MAX_SHOTS
-        from tools.routes.solver import _request_hw_cfg
 
         monkeypatch.setenv("IBM_QUANTUM_TOKEN", "server-held-token")
-        cfg = _request_hw_cfg(
+        cfg = self._cfg(
             {"hw": {"backend_name": "ibm_x", "shots": 10**9, "token": "attacker-token"}}
         )
         assert cfg["token"] == "server-held-token"  # caller's token ignored

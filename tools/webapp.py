@@ -47,7 +47,7 @@ sys.path.insert(0, str(_ROOT))
 
 from flask import Flask, jsonify, request  # noqa: E402
 from flask_cors import CORS  # noqa: E402
-from flask_socketio import SocketIO  # noqa: E402
+from flask_socketio import SocketIO, join_room  # noqa: E402
 
 from tools import state as app_state  # noqa: E402
 from tools.config import MAX_CLUES, MAX_CONTENT_LENGTH, MAX_GRID  # noqa: E402
@@ -138,6 +138,25 @@ def _origin_guard():
 
 # Bind SocketIO to state module so helpers can emit
 app_state.init(socketio)
+
+
+#: Longest client id we will treat as a room name. A room is just a string, so a
+#: caller could otherwise name one of any size.
+MAX_CLIENT_ID = 64
+
+
+@socketio.on("join")
+def on_join(data):
+    """Put this connection in the room its results will be addressed to.
+
+    The client picks the name and keeps it across a reload, so a reconnecting tab
+    lands back in the same room even though its sid changed. Rooms are per
+    connection and hold nothing, so the worst a guessed name buys is a copy of a
+    result that a caller would have to know the name to receive.
+    """
+    room = data.get("client_id") if isinstance(data, dict) else None
+    if isinstance(room, str) and 0 < len(room) <= MAX_CLIENT_ID:
+        join_room(room)
 
 # Register route blueprints
 for bp in ALL_BLUEPRINTS:

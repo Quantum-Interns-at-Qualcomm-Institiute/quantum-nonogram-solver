@@ -1,10 +1,13 @@
-"""IBM quantum hardware routes: backends, connect/disconnect.
+"""IBM quantum hardware routes: list the backends an account can reach.
 
 The IBM credentials are held by the SERVER (an environment secret), never supplied
 by a caller: a client must not be able to spend the owner's quantum credits, and
 this server must not relay a stranger's token. Who may reach these routes at all is
 decided upstream by the front door (Cloudflare Access for the owner, or a
 time-boxed recruiter pass), so the token stays out of the browser entirely.
+
+Which run reaches the QPU is per request: a solve carries its own ``hw`` block and
+the front door's entitlement header. See tools/routes/solver.py.
 """
 
 from __future__ import annotations
@@ -14,9 +17,8 @@ import os
 from flask import Blueprint, jsonify, request
 
 from nonogram.errors import ValidationError
-from tools import state as _state_mod
-from tools.errors import json_object, require_int, respond_error
-from tools.state import emit_status, state, state_lock
+from tools.errors import json_object, respond_error
+from tools.state import set_busy
 
 bp = Blueprint("hardware", __name__)
 
@@ -70,19 +72,63 @@ def api_hw_backends():
         return respond_error("hardware_error", _sanitize_error(exc), 400)
 
 
-@bp.route("/api/hw/config", methods=["POST"])
-def api_hw_config():
-    """Enable or disable hardware mode. Credentials come from the server, not the body."""
+@bp.route("/api/hw/jobs", methods=["POST"])
+def api_hw_submit():
+    """Submit a Grover circuit to IBM and return its job id.
+
+    Returns as soon as IBM has the job. The solver lock is held for the submission
+    and released immediately: an IBM queue can run to minutes, and holding the one
+    solver thread through it would 409 every other caller for the duration.
+    """
+    from tools.routes.solver import (
+        _acquire_or_busy,
+        _hw_or_error,
+        _parse_validated_clues,
+        _sanitize_error,
+    )
+
+    busy = _acquire_or_busy()
+    if busy is not None:
+        return busy
     try:
+        row_clues, col_clues, rows, cols, err = _parse_validated_clues()
+        if err is not None:
+            return err
         data = json_object(request.json or {})
-    except ValidationError as exc:
-        return respond_error("invalid_json", str(exc), 400)
-    if not data or data.get("disconnect"):
-        with state_lock:
-            state["hw_config"] = None
-        _state_mod.socketio.emit("hw_status", {"connected": False})
-        emit_status("Reverted to local statevector simulator.", "ok")
-        return jsonify({"ok": True})
+        hw_cfg, hw_err = _hw_or_error(data, rows, cols)
+        if hw_err is not None:
+            return hw_err
+        if not hw_cfg:
+            return respond_error(
+                "hardware_not_allowed", "This run is not allowed to reach hardware", 403
+            )
+        from nonogram.quantum import submit_hardware_job
+
+        submitted = submit_hardware_job(
+            (row_clues, col_clues),
+            token=hw_cfg["token"],
+            backend_name=hw_cfg["backend_name"],
+            channel=hw_cfg["channel"],
+            shots=hw_cfg["shots"],
+        )
+        # creg_names stay here: collecting finds the register by scanning the result,
+        # so a caller only ever needs the id.
+        submitted.pop("creg_names", None)
+        return jsonify({**submitted, "rows": rows, "cols": cols}), 202
+    except Exception as exc:
+        return respond_error("hardware_error", _sanitize_error(exc), 400)
+    finally:
+        set_busy(False)
+
+
+@bp.route("/api/hw/jobs/<job_id>", methods=["GET"])
+def api_hw_collect(job_id: str):
+    """Report what became of a submitted job, and its counts once it is done.
+
+    Takes no lock: polling a queue is not solving, and a visitor who reloaded
+    mid-run has only the id left to ask with.
+    """
+    from tools.routes.solver import _sanitize_error
 
     token = _ibm_token()
     if not token:
@@ -90,24 +136,8 @@ def api_hw_config():
             "hardware_unconfigured", "IBM hardware is not configured on this server", 503
         )
     try:
-        shots = require_int(data, "shots", 1024)
-    except ValidationError as exc:
-        return respond_error("invalid_shots", str(exc), 400)
-    cfg = {
-        "token": token,  # server-held; a caller can never set or read this
-        "channel": _ibm_channel(data),
-        "backend_name": data.get("backend_name"),
-        "shots": min(MAX_SHOTS, max(1, shots)),
-    }
-    with state_lock:
-        state["hw_config"] = cfg
-    _state_mod.socketio.emit(
-        "hw_status",
-        {"connected": True, "backend_name": cfg["backend_name"], "shots": cfg["shots"]},
-    )
-    emit_status(
-        f"Hardware mode: {cfg['backend_name']} ({cfg['shots']} shots) "
-        f"— real quantum jobs may take several minutes.",
-        "warn",
-    )
-    return jsonify({"ok": True})
+        from nonogram.quantum import collect_hardware_job
+
+        return jsonify(collect_hardware_job(job_id, token, _ibm_channel({})))
+    except Exception as exc:
+        return respond_error("hardware_error", _sanitize_error(exc), 400)

@@ -14,5 +14,9 @@ MAX_CONTENT_LENGTH = 256 * 1024  # 256 KB
 # (the UI offers 20; beyond that the extra trials only add sampling noise).
 MAX_TRIALS = 25
 
+#: Largest puzzle a hardware run accepts. Transpiled depth is ~139 layers at 4 cells,
+#: ~907 at 6 and ~3,020 at 9, against ~100-200 layers of Eagle/Heron coherence.
+MAX_HW_CELLS = 6
+
 RUNS_DIR = ROOT / "runs"
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
