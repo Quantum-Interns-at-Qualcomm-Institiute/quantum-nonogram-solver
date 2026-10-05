@@ -1,8 +1,0 @@
-{
-  "extraKnownMarketplaces": {
-    "windbag": {
-      "source": { "source": "github", "repo": "scale-venture-partners/windbag" }
-    }
-  },
-  "enabledPlugins": { "windbag@windbag": true }
-}
