@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # Authoring SDK for .railway/railway.py; only `railway config plan`
+    # and `apply` import it, and the image never installs this group.
+    "railway-sdk>=0.4,<1.0",
     "pytest>=7.0,<9.0",
     # the contract suite validates live responses against the shared schemas
     "jsonschema>=4.0,<5.0",
