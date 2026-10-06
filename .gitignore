@@ -1,6 +1,7 @@
 # Hidden files
 .*
 !.git*
+!.railway/
 !.dockerignore
 
 # Dependencies
