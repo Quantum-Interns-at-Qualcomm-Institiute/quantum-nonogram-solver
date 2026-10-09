@@ -14,7 +14,7 @@ Col clues:  (4),(1),(1),         ║■■□□■■║
 
 ## Results on hardware
 
-The 2×2 all-2s puzzle on `ibm_torino`, one Grover iteration, measured the correct `1111` state at 32.3%. The noiseless peak for one iteration on four qubits is 47.3%, and a uniform guess is 6.25%. That figure comes from a single 1,024-shot run whose counts and job ID were never archived; the hardware tests now write each run's counts, job ID, backend and transpiled depth to `runs/hardware/`, which is gitignored.
+The 2×2 all-2s puzzle on `ibm_fez`, one Grover iteration, 1,024 shots, measured the correct `1111` state at 36.8% — 377 shots, transpiled depth 146, job `db4m98imb58s7389da60`, 2026-10-09. The noiseless peak for one iteration on four qubits is 47.3%, and a uniform guess is 6.25%. The hardware tests write each run's counts, job ID, backend and transpiled depth to `runs/hardware/`, which is gitignored, so the figure has a run behind it. An earlier figure of 32.3% on `ibm_torino` came from a run whose counts and job ID were never kept, and `ibm_torino` is not offered on the Open plan, so it cannot be reproduced on that device.
 
 Circuit depth is what limits this. `PhaseOracleGate` compiles the nonogram constraint through general boolean synthesis, and depth grows fast:
 
